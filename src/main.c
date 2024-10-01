@@ -137,6 +137,7 @@ int main (int argc, char **argv) {
 
     if (prev_cwd != NULL) {
         SETERR_GOTO (mkdir_p (gstate[CONFDIR].str), exit);
+
         SETERR_GOTO (chdir (gstate[CONFDIR].str), exit);
 
         SETERR_GOTO (mkdir_p ("targets"), exit);

@@ -20,7 +20,7 @@ int sync_do (struct gitem *gstate) {
 
     char *target = gstate[TARGETS].str, *newline = NULL;
     char *targetcpy = NULL, *backup_path = NULL, *tmp_path = NULL,
-         *backup_symlink_path = NULL;
+         *backup_symlink_path = NULL, *targetname = NULL;
 
     while ((newline = strchr (target, '\n'))) {
         if (!newline) break;
@@ -29,9 +29,8 @@ int sync_do (struct gitem *gstate) {
         targetcpy = strdup (target);
         NULLSETERR_GOTO (targetcpy, exit);
 
-        char *targetname = basename (targetcpy);
-
-        ERR_SETERR_GOTO (strcmp (targetname, ".") == 0, exit);
+        targetname = strdup (basename (targetcpy));
+        NULLSETERR_GOTO (targetname, exit);
 
         // move target to backups
         backup_path = str_merge ("%s/%s", gstate[BACKUPSDIR].str, targetname);
@@ -67,6 +66,7 @@ int sync_do (struct gitem *gstate) {
 
 exit:
     free (targetcpy);
+    free (targetname);
     free (backup_path);
     free (tmp_path);
     free (backup_symlink_path);
@@ -78,8 +78,6 @@ int unsync_do (struct gitem *gstate) {
     errno = 0;
     int err = 0;
     (void)gstate;
-
-    
 
     return err;
 }
