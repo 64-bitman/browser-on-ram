@@ -1,0 +1,17 @@
+#!/bin/sh
+
+cd $(realpath test/)
+
+export BOR_TMPDIR=$(realpath runtimedir/)
+export BOR_CONFDIR=$(realpath config/)
+browser-on-ram -s -b "test-browser" "$(realpath profile/profile.one/)" "$(realpath profile/profile.two/)"
+
+tree -a
+
+rm -rf runtimedir/*
+find ! -name . -type l | xargs rm -f
+
+mv config/backups/* profile/ 2>/dev/null
+
+rm -rf config/.lock
+
