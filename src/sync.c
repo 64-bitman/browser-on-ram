@@ -18,58 +18,44 @@ int sync_do (struct gitem *gstate) {
     errno = 0;
     int err = 0;
 
-    char *target = gstate[TARGETS].str, *newline = NULL;
-    char *targetcpy = NULL, *backup_path = NULL, *tmp_path = NULL,
-         *backup_symlink_path = NULL, *targetname = NULL;
+    char *targetpath = strtok (gstate[TARGETS].str, "\n");
+    char *targetbasename = NULL;
+    char *prev_path = calloc (PATH_MAX, sizeof (*prev_path));
 
-    while ((newline = strchr (target, '\n'))) {
-        if (!newline) break;
-        *newline = 0;
+    NULLSETERR_GOTO (prev_path, exit);
 
-        targetcpy = strdup (target);
-        NULLSETERR_GOTO (targetcpy, exit);
+    do {
+        targetbasename = str_merge ("./%s", basename (targetpath));
 
-        targetname = strdup (basename (targetcpy));
-        NULLSETERR_GOTO (targetname, exit);
+        // move targetpath to backups location
+        SETERR_GOTO (chdir (gstate[BACKUPSDIR].str), exit);
+        SETERR_GOTO (rename (targetpath, targetbasename), exit);
+        NULLSETERR_GOTO (realpath (targetbasename, prev_path), exit);
+        log_print (LOG_DEBUG, "Moved '%s' to '%s'", targetpath, prev_path);
 
-        // move target to backups
-        backup_path = str_merge ("%s/%s", gstate[BACKUPSDIR].str, targetname);
-        NULLSETERR_GOTO (backup_path, exit);
+        // copy targetpath (in backups location) to tmpdir
+        SETERR_GOTO (chdir (prev_path), exit);
+        SETERR_GOTO (cp_r ("./", gstate[TMPDIR].str), exit);
+        SETERR_GOTO (chdir (gstate[TMPDIR].str), exit);
+        NULLSETERR_GOTO (realpath (targetbasename, prev_path), exit);
+        log_print (LOG_DEBUG, "Copied '%s/%s' to '%s'", gstate[BACKUPSDIR].str,
+                   targetbasename + 2, prev_path);
 
-        log_print (LOG_DEBUG, "Moving %s -> %s", targetcpy, backup_path);
-        SETERR_GOTO (rename (target, backup_path), exit);
+        // symlink tmpdir target to original location
+        chdir (dirname (targetpath));
+        SETERR_GOTO (symlink (prev_path, targetbasename), exit);
+        log_print (LOG_DEBUG, "Symlinked '%s' -> '%s/%s'", prev_path,
+                   targetpath, targetbasename + 2);
 
-        // copy backup to tmp diir
-        tmp_path = strdup (target);
-
-        tmp_path = str_merge ("%s/%s", gstate[TMPDIR].str, targetname);
-        NULLSETERR_GOTO (tmp_path, exit);
-
-        log_print (LOG_DEBUG, "Copying %s -> %s", backup_path, tmp_path);
-        SETERR_GOTO (cp_r (backup_path, tmp_path), exit);
-
-        // symlink original target path to tmpdir target
-        log_print (LOG_DEBUG, "Symlinking %s -> %s", targetcpy, tmp_path);
-        SETERR_GOTO (symlink (tmp_path, targetcpy), exit);
-
-        // create a symlink to backup in original dir for targets
-        backup_symlink_path = str_merge ("%s.bor-backup", targetcpy);
-
-        log_print (LOG_DEBUG, "Symlinking %s -> %s", backup_symlink_path,
-                   backup_path);
-        SETERR_GOTO (symlink (backup_path, backup_symlink_path), exit);
-
+        free (targetbasename);
+        targetbasename = NULL;
         fprintf (stderr, "\n");
-        *newline = '\n';
-        target = newline + 1;
-    }
+    } while ((targetpath = strtok (NULL, "\n")) != NULL);
+
 
 exit:
-    free (targetcpy);
-    free (targetname);
-    free (backup_path);
-    free (tmp_path);
-    free (backup_symlink_path);
+    free (targetbasename);
+    free (prev_path);
 
     return err;
 }

@@ -4,6 +4,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <fts.h>
+#include <libgen.h>
 #include <limits.h>
 #include <stdarg.h>
 #include <stdio.h>
@@ -58,9 +59,9 @@ void log_print (enum LogLevel level, const char *format, ...) {
 
     va_start (args, format);
 
-    fprintf(stderr, "(%s) ", log_names[level]);
+    fprintf (stderr, "(%s) ", log_names[level]);
     vfprintf (stderr, format, args);
-    fprintf(stderr, "\n");
+    fprintf (stderr, "\n");
 
     va_end (args);
 }
@@ -114,25 +115,36 @@ int cp_r (const char *oldpath, const char *newpath) {
     buffer = calloc (PATH_MAX + 1, sizeof (*buffer));
     NULLSETERR_GOTO (buffer, exit);
 
-    old_path = strndup (oldpath, PATH_MAX);
+    old_path = realpath (oldpath, NULL);
     NULLSETERR_GOTO (old_path, exit);
 
-    new_path = strndup (newpath, PATH_MAX);
+    new_path = realpath (newpath, NULL);
     NULLSETERR_GOTO (new_path, exit);
 
     char *paths[] = { old_path, NULL };
+    int include_root = (oldpath[strlen (oldpath) - 1] == '/') ? 1 : 0;
+
+    // to be initialized when fts_read returns root dir
+    char *oldpath_basename = NULL; 
 
     ftsp = fts_open (paths, FTS_PHYSICAL | FTS_XDEV, NULL);
     NULLSETERR_GOTO (ftsp, exit);
 
     // recursively go through old_path dir
     while ((ent = fts_read (ftsp)) != NULL) {
-
-        // change root dir from old_path to new_path
         strncpy (buffer, new_path, PATH_MAX - 1);
 
-        // dont include old_path dir itself
-        if (ent->fts_level != 0) {
+        // add root dir if trailing slash in oldpath
+        if (include_root && ent->fts_info != FTS_DP) {
+            if (ent->fts_level == 0) {
+                oldpath_basename = ent->fts_name;
+            }
+            if (strlen(buffer) != PATH_MAX) buffer[strlen(buffer)] = '/';
+            strncat(buffer, oldpath_basename, PATH_MAX - strlen(buffer));
+        }
+
+        if (ent->fts_level != 0 ) {
+            // cat everything after old_path root
             strncat (buffer, ent->fts_path + strlen (old_path),
                      PATH_MAX - strlen (buffer));
         }
