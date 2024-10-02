@@ -7,11 +7,15 @@ export BOR_CONFDIR=$(realpath config/)
 browser-on-ram -v -s -b "test-browser" "$(realpath profile/profile.one/)" "$(realpath profile/profile.two/)"
 
 tree -a
+cat config/backups/test-browser/targets.txt
+
+browser-on-ram -v -u -b "test-browser"
 
 rm -rf runtimedir/*
 find ! -name . -type l | xargs rm -f
 
-mv config/backups/* profile/ 2>/dev/null
+mv config/backups/test-browser/profile* profile/ 2>/dev/null
+rm -f config/backups/test-browser/targets.txt
 
 rm -rf config/.lock
 

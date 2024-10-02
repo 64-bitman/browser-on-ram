@@ -3,7 +3,6 @@
 #include "sync.h"
 #include "util.h"
 #include <assert.h>
-/* #include <errno.h> */
 #include <dirent.h>
 #include <fcntl.h>
 #include <fts.h>
@@ -22,7 +21,7 @@
 
 static const char *const GState_str[]
     = { "HOMEDIR",     "TMPDIR",     "BROWSERTYPE", "CONFDIR",   "TARGETSDIR",
-        "PROFILESDIR", "BACKUPSDIR", "TARGETS",     "GSTATE_LEN" };
+        "BACKUPSDIR", "TARGETS",     "GSTATE_LEN" };
 
 int main (int argc, char **argv) {
     int err = 0, opt = 0, fd = -1;
@@ -58,8 +57,8 @@ int main (int argc, char **argv) {
             break;
         case 'h':
         default:
-            printf ("Usage: browser-on-ram [-v] [-o] (-s | -r | -u) <-b BROWSER> "
-                    "TARGETS...\n");
+            printf ("Usage: browser-on-ram [-v] [-o] (-r | -u) <-b BROWSER> "
+                    "[-s <TARGETS...>]\n");
             return 0;
         }
     }
@@ -67,7 +66,7 @@ int main (int argc, char **argv) {
         log_print (LOG_ERROR, "TARGETS is required");
     }
 
-    char *prev_cwd = NULL, *buffer = NULL;
+    char *prev_cwd = NULL, *argvbuf = NULL;
     struct passwd *pwp = getpwuid (getuid ());
     struct gitem *gstate = calloc (
         GSTATE_LEN, sizeof (struct gitem)); // init all pointers to NULL
@@ -75,7 +74,7 @@ int main (int argc, char **argv) {
 
     if (browsertype == NULL) {
         log_print (LOG_ERROR,
-                   "Option <-b BROWSER> must be supplied or error occured");
+                   "Option <-b BROWSER> must be supplied or an error occured");
         goto exit;
     }
     gstate[BROWSERTYPE].str = browsertype;
@@ -87,15 +86,15 @@ int main (int argc, char **argv) {
         len++;
     }
     size++;
-    buffer = calloc (size + len, sizeof (*buffer));
-    NULLSETERR_GOTO (buffer, exit);
+    argvbuf = calloc (size + len, sizeof (*argvbuf));
+    NULLSETERR_GOTO (argvbuf, exit);
 
     for (int i = optind; i < argc; i++) {
-        strncat (buffer, argv[i], size - strlen (buffer) + 2);
-        buffer[strlen (buffer)] = '\n';
+        strncat (argvbuf, argv[i], size - strlen (argvbuf) + 2);
+        argvbuf[strlen (argvbuf)] = '\n';
     }
-    gstate[TARGETS].str = buffer;
-    buffer = NULL;
+    gstate[TARGETS].str = argvbuf;
+    argvbuf = NULL;
 
     // check env value first
     for (int i = 0; i < GSTATE_LEN; i++) {
@@ -108,24 +107,32 @@ int main (int argc, char **argv) {
         char *env = getenv (buf);
 
         if (env != NULL) {
-            gstate[i].str = strdup (env);
+            if (strcmp(buf, "BOR_TMPDIR") == 0) {
+                gstate[i].str = str_merge("%s/%s/", env, gstate[BROWSERTYPE].str);
+            } else {
+                gstate[i].str = strdup(env);
+            }
         }
     }
 
     // default values
     gstate[HOMEDIR].str = strdup (pwp->pw_dir);
+    {
+        char *bt = gstate[BROWSERTYPE].str;
 
-    if (gstate[TMPDIR].str == NULL)
-        gstate[TMPDIR].str
-            = str_merge ("/run/user/%d/browser-on-ram/", pwp->pw_uid);
+        if (gstate[TMPDIR].str == NULL)
+            gstate[TMPDIR].str
+                = str_merge ("/run/user/%d/browser-on-ram/%s/", pwp->pw_uid, bt);
 
-    if (gstate[CONFDIR].str == NULL)
-        gstate[CONFDIR].str
-            = str_merge ("%s/.config/browser-on-ram/", pwp->pw_dir);
+        if (gstate[CONFDIR].str == NULL)
+            gstate[CONFDIR].str
+                = str_merge ("%s/.config/browser-on-ram/", pwp->pw_dir);
 
-    gstate[TARGETSDIR].str = str_merge ("%s/targets/", gstate[CONFDIR].str);
-    gstate[PROFILESDIR].str = str_merge ("%s/profiles/", gstate[CONFDIR].str);
-    gstate[BACKUPSDIR].str = str_merge ("%s/backups/", gstate[CONFDIR].str);
+        gstate[TARGETSDIR].str
+            = str_merge ("%s/targets/%s", gstate[CONFDIR].str, bt);
+        gstate[BACKUPSDIR].str
+            = str_merge ("%s/backups/%s", gstate[CONFDIR].str, bt);
+    }
 
     for (int i = 0; i < GSTATE_LEN; i++) {
         if (gstate[i].str == NULL) {
@@ -142,11 +149,8 @@ int main (int argc, char **argv) {
     if (prev_cwd != NULL) {
         SETERR_GOTO (mkdir_p (gstate[CONFDIR].str), exit);
 
-        SETERR_GOTO (chdir (gstate[CONFDIR].str), exit);
-
-        SETERR_GOTO (mkdir_p ("targets"), exit);
-        SETERR_GOTO (mkdir_p ("profiles"), exit);
-        SETERR_GOTO (mkdir_p ("backups"), exit);
+        SETERR_GOTO (mkdir_p (gstate[TARGETSDIR].str), exit);
+        SETERR_GOTO (mkdir_p (gstate[BACKUPSDIR].str), exit);
 
         SETERR_GOTO (mkdir_p (gstate[TMPDIR].str), exit);
     } else {
@@ -159,7 +163,17 @@ int main (int argc, char **argv) {
     if (action == 's') {
         log_print (LOG_INFO, "Starting sync");
 
-        SETERR_GOTO (sync_do (gstate), exit);
+        switch(sync_do (gstate)) {
+            case -1:
+                err = -1;
+                goto exit;
+                break;
+            case -2:
+                // deal with leftover files
+                break;
+            default:
+                break;
+        }
     } else if (action == 'r') {
 
     } else if (action == 'u') {
@@ -177,7 +191,7 @@ exit:
     if (fd != -1) close (fd);
     free (gstate);
     free (prev_cwd);
-    free (buffer);
+    free (argvbuf);
 
     return (err == -1) ? 1 : 0;
 }

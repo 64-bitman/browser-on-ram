@@ -7,7 +7,6 @@ enum GState_Members {
     BROWSERTYPE,
     CONFDIR,
     TARGETSDIR,
-    PROFILESDIR,
     BACKUPSDIR,
     TARGETS,
     GSTATE_LEN

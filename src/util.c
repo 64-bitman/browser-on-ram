@@ -101,7 +101,7 @@ const char *file_getext (const char *filename) {
     return dot + 1;
 }
 
-int cp_r (const char *oldpath, const char *newpath) {
+int cp_r (const char *oldpath, const char *newpath, int inc_root) {
     errno = 0;
     int err = 0;
 
@@ -122,7 +122,6 @@ int cp_r (const char *oldpath, const char *newpath) {
     NULLSETERR_GOTO (new_path, exit);
 
     char *paths[] = { old_path, NULL };
-    int include_root = (oldpath[strlen (oldpath) - 1] == '/') ? 1 : 0;
 
     // to be initialized when fts_read returns root dir
     char *oldpath_basename = NULL; 
@@ -135,7 +134,7 @@ int cp_r (const char *oldpath, const char *newpath) {
         strncpy (buffer, new_path, PATH_MAX - 1);
 
         // add root dir if trailing slash in oldpath
-        if (include_root && ent->fts_info != FTS_DP) {
+        if (inc_root && ent->fts_info != FTS_DP) {
             if (ent->fts_level == 0) {
                 oldpath_basename = ent->fts_name;
             }

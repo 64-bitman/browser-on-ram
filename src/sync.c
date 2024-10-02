@@ -3,6 +3,7 @@
 #include "util.h"
 #include <assert.h>
 #include <errno.h>
+#include <fcntl.h>
 #include <fts.h>
 #include <libgen.h>
 #include <limits.h>
@@ -21,8 +22,20 @@ int sync_do (struct gitem *gstate) {
     char *targetpath = strtok (gstate[TARGETS].str, "\n");
     char *targetbasename = NULL;
     char *prev_path = calloc (PATH_MAX, sizeof (*prev_path));
+    int datafd = -1;
 
     NULLSETERR_GOTO (prev_path, exit);
+
+    // write to datafp listing original target paths
+    SETERR_GOTO(chdir(gstate[BACKUPSDIR].str), exit);
+    datafd = creat("./targets.txt", 0444);
+
+    if (datafd == -1 && errno == EACCES) {
+        log_print (LOG_WARN, "Found files of previous sync?");
+        err = -2;
+        goto exit;
+    }
+    SETERR_GOTO (datafd, exit);
 
     do {
         log_print (LOG_INFO, "Syncing '%s'", targetpath);
@@ -30,31 +43,35 @@ int sync_do (struct gitem *gstate) {
 
         // move targetpath to backups location
         SETERR_GOTO (chdir (gstate[BACKUPSDIR].str), exit);
+
         SETERR_GOTO (rename (targetpath, targetbasename), exit);
         NULLSETERR_GOTO (realpath (targetbasename, prev_path), exit);
         log_print (LOG_DEBUG, "Moved '%s' to '%s'", targetpath, prev_path);
 
+        dprintf(datafd, "%s\n", targetpath);
+
         // copy targetpath (in backups location) to tmpdir
         SETERR_GOTO (chdir (prev_path), exit);
-        SETERR_GOTO (cp_r ("./", gstate[TMPDIR].str), exit);
+        SETERR_GOTO (cp_r (".", gstate[TMPDIR].str, 1), exit);
         SETERR_GOTO (chdir (gstate[TMPDIR].str), exit);
         NULLSETERR_GOTO (realpath (targetbasename, prev_path), exit);
         log_print (LOG_DEBUG, "Copied '%s/%s' to '%s'", gstate[BACKUPSDIR].str,
                    targetbasename + 2, prev_path);
 
         // symlink tmpdir target to original location
-        chdir (dirname (targetpath));
+        SETERR_GOTO (chdir (dirname (targetpath)), exit);
         SETERR_GOTO (symlink (prev_path, targetbasename), exit);
         log_print (LOG_DEBUG, "Symlinked '%s' -> '%s/%s'", prev_path,
                    targetpath, targetbasename + 2);
 
         free (targetbasename);
         targetbasename = NULL;
+        log_print (LOG_INFO, "Synced '%s'", targetpath);
     } while ((targetpath = strtok (NULL, "\n")) != NULL);
-
 
     log_print (LOG_INFO, "Sync successful");
 exit:
+    if (datafd != -1) close(datafd);
     free (targetbasename);
     free (prev_path);
 

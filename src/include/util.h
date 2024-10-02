@@ -35,10 +35,10 @@
     } while (0)
 #define SETERR_GOTO(run, gt)                                                  \
     do {                                                                      \
-        if ((run) == (-1)) {                                                  \
+        if ((run) <= (-1)) {                                                  \
             err = -1;                                                         \
-            log_print (LOG_ERROR, "In function '%s' <%s:%d>:  %s", __FUNCTION__, \
-                       __FILE__, __LINE__, strerror (errno));                 \
+            log_print (LOG_ERROR, "In function '%s' <%s:%d>:  %s",            \
+                       __FUNCTION__, __FILE__, __LINE__, strerror (errno));   \
             goto gt;                                                          \
         }                                                                     \
     } while (0)
@@ -51,6 +51,11 @@
             goto gt;                                                          \
         }                                                                     \
     } while (0)
+
+#define PRINTCWD()                                                            \
+    char buf[PATH_MAX] = { 0 };                                               \
+    getcwd (buf, PATH_MAX);                                                   \
+    fprintf (stderr, ": %s\n", buf)
 
 #define log_setlevel(level) LOG_LEVEL = level
 #define BLOCK_SIZE 4096
@@ -68,6 +73,6 @@ void log_print (enum LogLevel level, const char *format, ...);
 int array_hasstr (const char **array, size_t len, const char *target);
 size_t forks_wait (pid_t *forks, size_t len);
 const char *file_getext (const char *filename);
-int cp_r (const char *oldpath, const char *newpath);
+int cp_r (const char *oldpath, const char *newpath, int inc_root);
 
 #endif

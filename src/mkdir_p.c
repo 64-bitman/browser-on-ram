@@ -2,6 +2,7 @@
  * https://gist.github.com/JonathonReinhart/8c0d90191c38af2dcadb102c4e202950 */
 /* thanks to Jonathon Reinhart <3 */
 #include <errno.h>
+#include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h> /* mkdir(2) */
