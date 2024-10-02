@@ -25,6 +25,7 @@ int sync_do (struct gitem *gstate) {
     NULLSETERR_GOTO (prev_path, exit);
 
     do {
+        log_print (LOG_INFO, "Syncing '%s'", targetpath);
         targetbasename = str_merge ("./%s", basename (targetpath));
 
         // move targetpath to backups location
@@ -49,10 +50,10 @@ int sync_do (struct gitem *gstate) {
 
         free (targetbasename);
         targetbasename = NULL;
-        fprintf (stderr, "\n");
     } while ((targetpath = strtok (NULL, "\n")) != NULL);
 
 
+    log_print (LOG_INFO, "Sync successful");
 exit:
     free (targetbasename);
     free (prev_path);

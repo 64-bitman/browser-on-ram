@@ -31,11 +31,12 @@ int main (int argc, char **argv) {
 
     (void)overlay;
     if (argc == 1) {
-        printf ("Argument required");
+        printf ("Argument required\n");
         return 0;
     }
 
-    while ((opt = getopt (argc, argv, "hsruob:")) != -1) {
+    LOG_LEVEL = LOG_INFO;
+    while ((opt = getopt (argc, argv, "hsruovb:")) != -1) {
         switch (opt) {
         case 's':
             action = 's';
@@ -49,12 +50,15 @@ int main (int argc, char **argv) {
         case 'o':
             overlay = 1;
             break;
+        case 'v':
+            LOG_LEVEL = LOG_DEBUG;
+            break;
         case 'b':
             browsertype = strdup (optarg);
             break;
         case 'h':
         default:
-            printf ("Usage: browser-on-ram [-o] (-s | -r | -u) <-b BROWSER> "
+            printf ("Usage: browser-on-ram [-v] [-o] (-s | -r | -u) <-b BROWSER> "
                     "TARGETS...\n");
             return 0;
         }
@@ -153,13 +157,13 @@ int main (int argc, char **argv) {
     chdir (prev_cwd);
 
     if (action == 's') {
-        log_print (LOG_DEBUG, "Starting sync");
+        log_print (LOG_INFO, "Starting sync");
 
         SETERR_GOTO (sync_do (gstate), exit);
     } else if (action == 'r') {
 
     } else if (action == 'u') {
-        log_print (LOG_DEBUG, "Starting unsync");
+        log_print (LOG_INFO, "Starting unsync");
 
         SETERR_GOTO (unsync_do (gstate), exit);
     }

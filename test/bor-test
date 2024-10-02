@@ -4,7 +4,7 @@ cd $(realpath test/)
 
 export BOR_TMPDIR=$(realpath runtimedir/)
 export BOR_CONFDIR=$(realpath config/)
-browser-on-ram -s -b "test-browser" "$(realpath profile/profile.one/)" "$(realpath profile/profile.two/)"
+browser-on-ram -v -s -b "test-browser" "$(realpath profile/profile.one/)" "$(realpath profile/profile.two/)"
 
 tree -a
 
