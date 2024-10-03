@@ -5,5 +5,6 @@
 
 int sync_do (struct gitem *gstate);
 int unsync_do (struct gitem *gstate);
+int resync_do (struct gitem *gstate);
 
 #endif

@@ -112,6 +112,11 @@ int cp_r (const char *oldpath, const char *newpath, int inc_root) {
     FTS *ftsp = NULL;
     FTSENT *ent = NULL;
 
+    err = -1;
+    if (mkdir (oldpath, 0755) == -1 && errno != EEXIST) goto exit;
+    if (mkdir (newpath, 0755) == -1 && errno != EEXIST) goto exit;
+    err = 0;
+
     buffer = calloc (PATH_MAX + 1, sizeof (*buffer));
     NULLSETERR_GOTO (buffer, exit);
 
@@ -124,7 +129,7 @@ int cp_r (const char *oldpath, const char *newpath, int inc_root) {
     char *paths[] = { old_path, NULL };
 
     // to be initialized when fts_read returns root dir
-    char *oldpath_basename = NULL; 
+    char *oldpath_basename = NULL;
 
     ftsp = fts_open (paths, FTS_PHYSICAL | FTS_XDEV, NULL);
     NULLSETERR_GOTO (ftsp, exit);
@@ -133,16 +138,15 @@ int cp_r (const char *oldpath, const char *newpath, int inc_root) {
     while ((ent = fts_read (ftsp)) != NULL) {
         strncpy (buffer, new_path, PATH_MAX - 1);
 
-        // add root dir if trailing slash in oldpath
         if (inc_root && ent->fts_info != FTS_DP) {
             if (ent->fts_level == 0) {
                 oldpath_basename = ent->fts_name;
             }
-            if (strlen(buffer) != PATH_MAX) buffer[strlen(buffer)] = '/';
-            strncat(buffer, oldpath_basename, PATH_MAX - strlen(buffer));
+            if (strlen (buffer) != PATH_MAX) buffer[strlen (buffer)] = '/';
+            strncat (buffer, oldpath_basename, PATH_MAX - strlen (buffer));
         }
 
-        if (ent->fts_level != 0 ) {
+        if (ent->fts_level != 0) {
             // cat everything after old_path root
             strncat (buffer, ent->fts_path + strlen (old_path),
                      PATH_MAX - strlen (buffer));
@@ -195,5 +199,38 @@ exit:
     free (old_path);
     free (new_path);
     free (buffer);
+    return err;
+}
+
+int rmdir_r (const char *_path) {
+    errno = 0;
+    int err = 0;
+
+    char *path = NULL;
+    FTS *ftsp = NULL;
+    FTSENT *ent = NULL;
+
+    path = realpath (_path, NULL);
+    NULLSETERR_GOTO (path, exit);
+
+    char *paths[] = { path, NULL };
+
+    ftsp = fts_open (paths, FTS_PHYSICAL | FTS_XDEV | FTS_NOCHDIR, NULL);
+    NULLSETERR_GOTO (ftsp, exit);
+
+    while ((ent = fts_read (ftsp)) != NULL) {
+
+        if (ent->fts_info == FTS_DP) {
+            SETERR_GOTO (rmdir (ent->fts_path), exit);
+            continue;
+        }
+        if (ent->fts_info == FTS_D) continue;
+
+        SETERR_GOTO (unlink (ent->fts_path), exit);
+    }
+
+exit:
+    fts_close (ftsp);
+    free (path);
     return err;
 }

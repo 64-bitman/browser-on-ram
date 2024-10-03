@@ -74,5 +74,6 @@ int array_hasstr (const char **array, size_t len, const char *target);
 size_t forks_wait (pid_t *forks, size_t len);
 const char *file_getext (const char *filename);
 int cp_r (const char *oldpath, const char *newpath, int inc_root);
+int rmdir_r (const char *_path);
 
 #endif
