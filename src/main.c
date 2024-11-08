@@ -485,10 +485,11 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
 
     do {
         LOG (LOG_INFO, "syncing %s", dir->path);
+
         // check if path exists
         if (lstat (dir->path, &sb) == -1) {
-            LOG (LOG_WARN, "sync target %s does not exist, skipping",
-                 dir->path);
+            LOG (LOG_WARN, "sync target %s does not exist, skipping", dir->path);
+            // TODO: check if tmpfs or backup dir exists
             continue;
         }
         // check if path is not a dir
@@ -532,6 +533,7 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
         // check if dir exists in tmpfs
         if (lstat (dir->tmp_path, &sb) == 0 && S_ISDIR (sb.st_mode)) {
             LOG (LOG_WARN, "found %s in tmpfs dir, recovering", dir->dirname);
+
             if (recover_dir (dir->tmp_path, browsername) == -1) {
                 LOG (LOG_WARN, "failed recovering, skipping");
             }
@@ -539,6 +541,7 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
         // check if dir exists in backups
         if (lstat (dir->backup_path, &sb) == 0 && !S_ISDIR (sb.st_mode)) {
             LOG (LOG_WARN, "found %s in backup dir, recovering", dir->dirname);
+
             if (recover_dir (dir->backup_path, browsername) == -1) {
                 LOG (LOG_WARN, "failed recovering, skipping");
             }
@@ -606,31 +609,14 @@ int do_resync (void) {
             continue;
         }
 
-        char *tmp_bkuppath = create_unique_filename (dir->backup_path, "-tmp");
-
-        CHECKALLOC (tmp_bkuppath, true);
-
         // copy tmpfs dir over to backups
-        if (copy_r (dir->tmp_path, tmp_bkuppath) == -1) {
+        if (copy_r (dir->tmp_path, dir->backup_path) == -1) {
             LOG (LOG_WARN, "failed copying %s to %s, skipping ", dir->tmp_path,
-                 tmp_bkuppath);
+                 dir->backup_path);
             PERROR ();
             continue;
         }
 
-        // swap backup and new backup
-        if (renameat2 (AT_FDCWD, dir->backup_path, AT_FDCWD, tmp_bkuppath,
-                       RENAME_EXCHANGE)
-            == -1) {
-            LOG (LOG_WARN, "failed swapping %s and %s, skipping ",
-                 dir->backup_path, tmp_bkuppath);
-            PERROR ();
-            remove_r (tmp_bkuppath);
-            continue;
-        }
-        remove_r (tmp_bkuppath);
-
-        free (tmp_bkuppath);
         LOG (LOG_INFO, "successfully resynced %s", dir->path);
 
     } while ((dir = walk_browsers (NULL, 0, &browsername)) != NULL);

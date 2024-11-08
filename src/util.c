@@ -77,8 +77,9 @@ int copy_r (const char *src, const char *dest) {
     if (stat (src, &sb) == -1) {
         return -1;
     }
-
-    char *cmd = print2string ("cp -a --reflink=auto '%s' '%s'", src, dest);
+    // add slash at end to prevent rsync placing src in dest
+    char *cmd = print2string (
+        "rsync -aX --no-whole-file --inplace '%s/' '%s'", src, dest);
 
     if (cmd == NULL) return -1;
 
