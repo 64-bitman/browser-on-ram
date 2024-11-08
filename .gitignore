@@ -1,0 +1,8 @@
+bin/
+dep/
+*.vim
+vgcore.*
+.*
+!.gitignore
+!.clang-format
+compile_commands.json
