@@ -488,40 +488,53 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
 
         // check if path exists
         if (lstat (dir->path, &sb) == -1) {
-            LOG (LOG_WARN, "sync target %s does not exist, skipping", dir->path);
-            // TODO: check if tmpfs or backup dir exists
-            continue;
+
+            // check if tmpfs or backup dir exists
+            // if so, then attempt to move/copy tmpfs/backup to path
+            // and use it as sync target
+            if (stat (dir->tmp_path, &sb) == 0 && S_ISDIR (sb.st_mode)) {
+                if (copy_r (dir->tmp_path, dir->path) == -1) continue;
+                if (remove_r (dir->tmp_path) == -1) continue;
+
+                LOG (LOG_WARN, "path non-existent, but tmpfs path exists, "
+                               "using tmpfs instead");
+            } else if (stat (dir->backup_path, &sb) == 0
+                       && S_ISDIR (sb.st_mode)) {
+                if (rename (dir->backup_path, dir->path) == -1) continue;
+
+                LOG (LOG_WARN, "path non-existent, but backup path exists, "
+                               "using backup instead");
+            } else {
+                LOG (LOG_WARN, "path does not exist, skipping", dir->path);
+                continue;
+            }
         }
+
         // check if path is not a dir
         if (!S_ISDIR (sb.st_mode)) {
-            // check if its a valid symlink pointing to a directory
+
+            // abort if it is a valid symlink
             if (S_ISLNK (sb.st_mode) && stat (dir->path, &sb) == 0) {
-                LOG (LOG_ERROR,
-                     "%s is a symlink pointing to a directory, aborting",
-                     dir->path);
+                LOG (LOG_ERROR, "%s is a valid symlink, aborting", dir->path);
                 return -1;
+
             } else if (S_ISLNK (sb.st_mode)) {
                 // path is a dangling symlink
                 // attempt to use backups as sync target if it exists
                 if (stat (dir->backup_path, &sb) == 0
-                    || S_ISDIR (sb.st_mode)) {
+                    && S_ISDIR (sb.st_mode)) {
 
                     LOG (LOG_WARN, "%s is a dangling symlink, using backups",
                          dir->path);
                 } else {
                     LOG (LOG_WARN, "%s is a dangling symlink, skipping",
                          dir->path);
+                    continue;
                 }
 
                 // delete symlink and move backups to path
-                if (remove (dir->path) == -1) {
-                    LOG (LOG_WARN, "failed deleting symlink, skipping");
-                    continue;
-                }
-                if (rename (dir->backup_path, dir->path) == -1) {
-                    LOG (LOG_WARN, "failed moving backup back, skipping");
-                    continue;
-                }
+                if (remove (dir->path) == -1) continue;
+                if (rename (dir->backup_path, dir->path) == -1) continue;
 
             } else {
                 LOG (LOG_WARN, "sync target %s is not a directory, skipping",
@@ -530,21 +543,17 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
             }
         }
 
-        // check if dir exists in tmpfs
+        // check if dir exists in tmpfs, if so recover
         if (lstat (dir->tmp_path, &sb) == 0 && S_ISDIR (sb.st_mode)) {
             LOG (LOG_WARN, "found %s in tmpfs dir, recovering", dir->dirname);
 
-            if (recover_dir (dir->tmp_path, browsername) == -1) {
-                LOG (LOG_WARN, "failed recovering, skipping");
-            }
+            if (recover_dir (dir->tmp_path, browsername) == -1) continue;
         }
-        // check if dir exists in backups
-        if (lstat (dir->backup_path, &sb) == 0 && !S_ISDIR (sb.st_mode)) {
+        // check if dir exists in backups, if so recover
+        if (lstat (dir->backup_path, &sb) == 0 && S_ISDIR (sb.st_mode)) {
             LOG (LOG_WARN, "found %s in backup dir, recovering", dir->dirname);
 
-            if (recover_dir (dir->backup_path, browsername) == -1) {
-                LOG (LOG_WARN, "failed recovering, skipping");
-            }
+            if (recover_dir (dir->backup_path, browsername) == -1) continue;
         }
 
         remove (dir->tmp_path);
