@@ -14,7 +14,7 @@ pid_t pgrep (const char *name);
 off_t get_dir_size (const char *path);
 char *human_readable (off_t bytes);
 char *replace_char (char *str, char target, char replace);
-int is_dot (char *name);
+int systemd_userservice_active (const char *name);
 
 extern int LOG_LEVEL;
 

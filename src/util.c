@@ -78,8 +78,8 @@ int copy_r (const char *src, const char *dest) {
         return -1;
     }
     // add slash at end to prevent rsync placing src in dest
-    char *cmd = print2string (
-        "rsync -aX --no-whole-file --inplace '%s/' '%s'", src, dest);
+    char *cmd = print2string ("rsync -aX --no-whole-file --inplace '%s/' '%s'",
+                              src, dest);
 
     if (cmd == NULL) return -1;
 
@@ -120,6 +120,7 @@ int remove_r (const char *path) {
         if (ent->fts_info == FTS_D || ent->fts_info == FTS_ERR) {
             continue;
         }
+        chmod (ent->fts_name, 0666);
         remove (ent->fts_name);
     }
     remove (path);
@@ -204,8 +205,8 @@ off_t get_dir_size (const char *path) {
     off_t size = 0;
 
     while ((ent = fts_read (ftsp)) != NULL) {
-        if (ent->fts_info != FTS_NSOK && ent->fts_info != FTS_ERR
-            && ent->fts_info != FTS_NS && ent->fts_info != FTS_DNR) {
+        if (ent->fts_info == FTS_F || ent->fts_info == FTS_NSOK
+            || ent->fts_info == FTS_DEFAULT || ent->fts_info == FTS_D) {
             size += ent->fts_statp->st_size;
         }
     }
@@ -221,17 +222,19 @@ off_t get_dir_size (const char *path) {
 }
 
 char *human_readable (off_t bytes) {
-    int count = 0;
-    const char *unitsstr[] = { "B", "KB", "MB", "GB", "TB" };
+    char *suffix[] = { "B", "KB", "MB", "GB", "TB" };
+    char length = sizeof (suffix) / sizeof (suffix[0]);
+
+    int i = 0;
+    double dblBytes = bytes;
+
+    if (bytes > 1024) {
+        for (i = 0; (bytes / 1024) > 0 && i < length - 1; i++, bytes /= 1024)
+            dblBytes = bytes / 1024.0;
+    }
+
     char *str = NULL;
-    double n = bytes;
-
-    do {
-        n /= 1000;
-        count++;
-    } while (n >= 1000 && count < 4);
-
-    asprintf (&str, "%.3g %s", n, unitsstr[count]);
+    asprintf (&str, "%.4g %s", dblBytes, suffix[i]);
 
     return str;
 }
@@ -244,4 +247,19 @@ char *replace_char (char *str, char target, char replace) {
         current_pos = strchr (current_pos, target);
     }
     return str;
+}
+
+int systemd_userservice_active (const char *name) {
+    char *cmd = print2string ("systemctl --user --quiet is-active '%s'", name);
+
+    if (cmd == NULL) return false;
+
+    int status = system (cmd);
+    free (cmd);
+
+    if (status == 0) {
+        return true;
+    }
+
+    return false;
 }

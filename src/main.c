@@ -26,6 +26,7 @@ static char *CONFDIR_BACKUPSDIR = NULL;
 static char *CONFDIR_CRASHDIR = NULL;
 static char *TMPDIR = NULL;
 static char *SCRIPTDIR = NULL;
+static int IGNORE_CHECK = false;
 
 struct Dir {
     char *dirname;
@@ -43,6 +44,7 @@ struct Browser {
 
 void help (void);
 void status (void);
+int toggle_lock (void);
 
 int initialize_dirs (void);
 struct Dir create_dir_s (char **buffer, const char *browsername);
@@ -64,6 +66,7 @@ int main (int argc, char **argv) {
                              { "unsync", no_argument, NULL, 'u' },
                              { "resync", no_argument, NULL, 'r' },
                              { "status", no_argument, NULL, 'p' },
+                             { "ignore", no_argument, NULL, 'i' },
                              { "verbose", no_argument, NULL, 'v' },
                              { "help", no_argument, NULL, 'h' },
                              { 0, 0, 0, 0 } };
@@ -71,7 +74,7 @@ int main (int argc, char **argv) {
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "survphn", opts, &longindex))
+    while ((opt = getopt_long (argc, argv, "surpivh", opts, &longindex))
            != -1) {
         switch (opt) {
         case 's':
@@ -88,6 +91,9 @@ int main (int argc, char **argv) {
             break;
         case 'p':
             action = 'p';
+            break;
+        case 'i':
+            IGNORE_CHECK = true;
             break;
         case 'h':
             help ();
@@ -110,7 +116,6 @@ int main (int argc, char **argv) {
 
     switch (action) {
     case 's': {
-
         struct Browser *browsers = NULL;
         size_t browsers_len = 0;
 
@@ -119,6 +124,7 @@ int main (int argc, char **argv) {
             err = 1;
             break;
         }
+        if (toggle_lock() == -1) return -1;
         err = do_sync (browsers, browsers_len) * -1;
         break;
     }
@@ -131,6 +137,7 @@ int main (int argc, char **argv) {
             break;
         }
         err = do_unsync () * -1;
+        if (toggle_lock() == -1) return -1;
         break;
     }
     case 'p':
@@ -147,6 +154,7 @@ void help (void) {
     printf ("-u, --unsync           unsync browsers\n");
     printf ("-r, --resync           resync browsers\n");
     printf ("-p, --status           show current status and configuration\n");
+    printf ("-i, --ignore           ignore safety checks\n");
     printf ("-v, --verbose          enable debug logs\n");
     printf ("-h, --help             show this message\n\n");
     printf ("It is not recommended to use sync, unsync, or resync standalone.\n");
@@ -154,7 +162,95 @@ void help (void) {
 }
 // clang-format on
 
-void status (void) {}
+void status (void) {
+    errno = 0;
+    if (chdir (CONFDIR) == -1) return;
+
+    struct stat sb;
+    int lock_exists = (stat ("lock", &sb) == 0) ? true : false;
+
+    printf ("Browser-on-RAM " VERSION "\n\n");
+
+    {
+        printf ("---Status---\n\n");
+        printf ("Active:            %s\n", (lock_exists) ? "true" : "false");
+        printf ("Systemd service:   %s\n",
+                (systemd_userservice_active ("bor.service")) ? "active"
+                                                             : "inactive");
+        printf ("Resync timer:      %s\n",
+                (systemd_userservice_active ("bor-resync.timer"))
+                    ? "active"
+                    : "inactive");
+    }
+    printf ("\n---Configured Directories---\n");
+
+    struct Browser *browsers = NULL;
+    size_t browsers_len = 0;
+
+    // use backups dir to find directories if lock exists
+    // else use browser conf
+    if (lock_exists) {
+        if (get_browsers (CONFDIR_BACKUPSDIR, &browsers, &browsers_len) == -1)
+            return;
+    } else {
+        if (read_browsersconf (&browsers, &browsers_len) == -1) return;
+    }
+
+    char *browsername = NULL;
+    struct Dir *dir = walk_browsers (browsers, browsers_len, &browsername);
+
+    if (dir == NULL) return;
+
+    do {
+        printf ("\n");
+        printf ("Browser:           %s\n", browsername);
+        printf ("Directory:         %s\n", dir->path);
+        // clang-format off
+        if (lock_exists) {
+        printf ("Tmpfs directory:   %s\n", dir->tmp_path);
+        printf ("Backup directory:  %s\n", dir->backup_path);
+        }
+        // clang-format on
+        printf ("Directory size:    %s\n",
+                human_readable (get_dir_size (dir->path)));
+
+    } while ((dir = walk_browsers (NULL, 0, &browsername)) != NULL);
+
+    // print crash recovery dirs
+    printf ("\n---Crash Recovery---\n");
+    browsers = NULL;
+    browsers_len = 0;
+    if (get_browsers (CONFDIR_CRASHDIR, &browsers, &browsers_len) == -1)
+        return;
+
+    dir = walk_browsers (browsers, browsers_len, &browsername);
+
+    if (dir == NULL) return;
+
+    do {
+        printf ("\nBrowser:         %s", browsername);
+    } while ((dir = walk_browsers (NULL, 0, &browsername)));
+}
+
+int toggle_lock (void) {
+    errno = 0;
+    if (chdir (CONFDIR) == -1) return -1;
+
+    struct stat sb;
+
+    if (stat ("lock", &sb) == 0) {
+        // lock exists, remove it
+        chmod ("lock", 0666);
+        if (remove ("lock") == -1) return -1;
+    } else {
+        // create lock
+        int fd = creat ("lock", O_RDONLY);
+        fchmod (fd, 0444);
+        close (fd);
+    }
+
+    return 0;
+}
 
 // init required dirs and create browsers.conf template
 int initialize_dirs (void) {
@@ -229,6 +325,7 @@ int initialize_dirs (void) {
 }
 
 struct Dir create_dir_s (char **buffer, const char *browsername) {
+    errno = 0;
     char *buf = *buffer;
 
     struct Dir dir = { 0 };
@@ -255,6 +352,7 @@ struct Dir create_dir_s (char **buffer, const char *browsername) {
 
 // read browsers.conf and return array of structs for dirs to synchronize
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
+    errno = 0;
     if (*browsers == NULL) {
         *browsers = calloc (MAX_BROWSERS, sizeof (**browsers));
 
@@ -301,11 +399,17 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         if (chdir (SCRIPTDIR) == -1) return -1;
 
         // read from shell script output
-        char *cmd = print2string ("./%s.sh", browsername);
+        char *cmd = print2string ("sh ./%s.sh", browsername);
+
+        CHECKALLOC(cmd, true);
         char *buf = NULL;
         size_t dirpath_size = 0;
         FILE *pp = popen (cmd, "r");
 
+        if (pp == NULL) { 
+            PERROR();
+            return -1;
+        }
         struct Dir *dirs = calloc (MAX_DIRS, sizeof (*dirs));
 
         CHECKALLOC (dirs, true);
@@ -321,6 +425,9 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
             dirs[browser.dirs_len] = dir;
             (browser.dirs_len)++;
+        }
+        if (browser.dirs_len == 0) {
+            LOG (LOG_WARN, "recieved no directories from %s", browsername);
         }
 
         free (cmd);
@@ -341,6 +448,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 // go through root and find dirs from each browser dir
 int get_browsers (char *rootpath, struct Browser **browsers,
                   size_t *browsers_len) {
+    errno = 0;
     if (*browsers == NULL) {
         *browsers = calloc (MAX_BROWSERS, sizeof (**browsers));
 
@@ -423,6 +531,7 @@ struct Dir *walk_browsers (struct Browser *browsers, size_t browsers_len,
 }
 
 int recover_dir (const char *path, const char *browsername) {
+    errno = 0;
     struct stat sb;
 
     LOG (LOG_INFO, "recovering %s", path);
@@ -480,10 +589,22 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
     char *browsername = NULL;
     struct Dir *dir = walk_browsers (browsers, browsers_len, &browsername);
     struct stat sb;
+    char *abrt_browser = "";
 
     if (dir == NULL) return -1;
 
     do {
+        // skip if browser set to be skipped previously
+        if (strcmp (abrt_browser, browsername) == 0) {
+            continue;
+        }
+        // skip browser if process running
+        if (pgrep (browsername) != -1 && !IGNORE_CHECK) {
+            LOG (LOG_ERROR, "%s instance detected, skipping browser",
+                 browsername);
+            abrt_browser = browsername;
+            continue;
+        }
         LOG (LOG_INFO, "syncing %s", dir->path);
 
         // check if path exists
@@ -513,10 +634,11 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
         // check if path is not a dir
         if (!S_ISDIR (sb.st_mode)) {
 
-            // abort if it is a valid symlink
+            // skip browser if it is a valid symlink
             if (S_ISLNK (sb.st_mode) && stat (dir->path, &sb) == 0) {
-                LOG (LOG_ERROR, "%s is a valid symlink, aborting", dir->path);
-                return -1;
+                LOG (LOG_ERROR, "%s is a valid symlink, skipping %s",
+                     dir->path, browsername);
+                abrt_browser = "firefox";
 
             } else if (S_ISLNK (sb.st_mode)) {
                 // path is a dangling symlink
@@ -590,11 +712,11 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
 }
 
 int do_resync (void) {
+    errno = 0;
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
 
     if (get_browsers (CONFDIR_BACKUPSDIR, &browsers, &browsers_len) == -1) {
-        PERROR ();
         return -1;
     };
 
@@ -634,6 +756,7 @@ int do_resync (void) {
 }
 
 int do_unsync (void) {
+    errno = 0;
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
 
