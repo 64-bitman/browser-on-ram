@@ -26,10 +26,24 @@ extern int LOG_LEVEL;
 #define LOG_WARN 1
 #define LOG_ERROR 0
 
-#define EXISTS(path) stat (path, &sb) == 0
+#define EXISTS(path) (stat (path, &sb) == 0)
+#define LEXISTS(path) (lstat (path, &sb) == 0)
 
 #define LOG(level, format, ...)                                               \
     log_print (level, __FILE__, __LINE__, format, ##__VA_ARGS__)
+
+// ansi escape codes
+#define BOLD "\e[1m"
+#define DIM "\e[2m"
+#define ITALIC "\e[3m"
+#define UNDERLINE "\e[4m"
+#define RESET "\e[0m"
+
+#define RED "\e[31m"
+#define GREEN "\e[32m"
+#define YELLOW "\e[33m"
+#define BLUE "\e[34m"
+#define BLUE "\e[34m"
 
 #define CHECKALLOC(var, do_return)                                            \
     do {                                                                      \

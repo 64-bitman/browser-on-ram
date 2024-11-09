@@ -167,12 +167,13 @@ void status (void) {
     if (chdir (CONFDIR) == -1) return;
 
     struct stat sb;
-    int lock_exists = (stat ("lock", &sb) == 0) ? true : false;
+    int lock_exists = (EXISTS ("lock")) ? true : false;
 
-    printf ("Browser-on-RAM " VERSION "\n\n");
+    printf (BOLD "Browser-on-RAM " VERSION "\n\n" RESET);
 
     {
-        printf ("---Status---\n\n");
+        printf (BOLD "---Status---\n\n" RESET);
+        printf (BOLD BLUE);
         printf ("Active:            %s\n", (lock_exists) ? "true" : "false");
         printf ("Systemd service:   %s\n",
                 (systemd_userservice_active ("bor.service")) ? "active"
@@ -181,8 +182,9 @@ void status (void) {
                 (systemd_userservice_active ("bor-resync.timer"))
                     ? "active"
                     : "inactive");
+        printf (RESET);
     }
-    printf ("\n---Configured Directories---\n");
+    printf (BOLD "\n---Configured Directories---\n" RESET);
 
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
@@ -202,29 +204,29 @@ void status (void) {
     if (dir == NULL) return;
 
     do {
-        int path_exists = stat (dir->path, &sb) == 0 ? true : false;
-        int tmp_exists = stat (dir->tmp_path, &sb) == 0 ? true : false;
-        int backup_exists = stat (dir->backup_path, &sb) == 0 ? true : false;
+        int path_exists = EXISTS (dir->path) ? true : false;
+        int tmp_exists = EXISTS (dir->tmp_path) ? true : false;
+        int backup_exists = EXISTS (dir->backup_path) ? true : false;
 
         printf ("\n");
-        printf ("Browser:           %s\n", browsername);
-        printf ("Directory:         %s %s\n", dir->path,
+        printf ("Browser:           "YELLOW"%s\n"RESET, browsername);
+        printf ("Directory:         "UNDERLINE"%s"RESET" %s\n", dir->path,
                 (path_exists) ? "" : "(does not exist)");
-        // clang-format off
         if (lock_exists) {
-        printf ("Tmpfs directory:   %s %s\n", dir->tmp_path,
-                (tmp_exists) ? "" : "(does not exist)");
-        printf ("Backup directory:  %s %s\n", dir->backup_path,
-                (backup_exists) ? "" : "(does not exist)");
+            printf ("Tmpfs directory:   %s/" BOLD RED "%s" RESET " %s\n",
+                    TMPDIR, dir->dirname,
+                    (tmp_exists) ? "" : "(does not exist)");
+            printf ("Backup directory:  %s/" BOLD RED "%s" RESET " %s\n",
+                    CONFDIR_BACKUPSDIR, dir->dirname,
+                    (backup_exists) ? "" : "(does not exist)");
         }
-        // clang-format on
-        printf ("Directory size:    %s\n",
+        printf ("Directory size:    "GREEN"%s\n"RESET,
                 human_readable (get_dir_size (dir->path)));
 
     } while ((dir = walk_browsers (NULL, 0, &browsername)) != NULL);
 
     // print crash recovery dirs
-    printf ("\n---Crash Recovery---\n");
+    printf (BOLD "\n---Crash Recovery---\n" RESET);
     browsers = NULL;
     browsers_len = 0;
     if (get_browsers (CONFDIR_CRASHDIR, &browsers, &browsers_len) == -1)
@@ -245,7 +247,7 @@ int toggle_lock (void) {
 
     struct stat sb;
 
-    if (stat ("lock", &sb) == 0) {
+    if (EXISTS ("lock")) {
         // lock exists, remove it
         chmod ("lock", 0666);
         if (remove ("lock") == -1) return -1;
@@ -304,7 +306,7 @@ int initialize_dirs (void) {
     struct stat sb;
 
     // share dir should be already created
-    if (stat (SCRIPTDIR, &sb) == -1) {
+    if (!EXISTS (SCRIPTDIR)) {
         LOG (LOG_ERROR, "script directory does not exist");
         return -1;
     }
@@ -318,7 +320,7 @@ int initialize_dirs (void) {
     // create browser.conf template if it doesn't exist
     if (chdir (CONFDIR) == -1) return -1;
 
-    if (stat ("browsers.conf", &sb) == -1) {
+    if (!EXISTS ("browsers.conf")) {
         int fd = creat ("browsers.conf", 0644);
 
         dprintf (fd, "# each line corrosponds to a browser that should be "
@@ -371,7 +373,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
     struct stat sb;
 
-    if (stat ("browsers.conf", &sb) == -1) {
+    if (!EXISTS ("browsers.conf")) {
         LOG (LOG_ERROR, "browsers.conf does not exist");
         return -1;
     } else if (!S_ISREG (sb.st_mode) && !S_ISLNK (sb.st_mode)) {
@@ -543,8 +545,8 @@ int recover_dir (const char *path, const char *browsername) {
 
     LOG (LOG_INFO, "recovering %s", path);
 
-    // check if path exists
-    if (stat (path, &sb) == -1) {
+    // check if path does not exist
+    if (!EXISTS (path)) {
         LOG (LOG_ERROR, "cannot recover non-existent path %s", path);
         return -1;
     }
@@ -614,20 +616,19 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
         }
         LOG (LOG_INFO, "syncing %s", dir->path);
 
-        // check if path exists
-        if (lstat (dir->path, &sb) == -1) {
+        // check if path does not exist
+        if (!LEXISTS (dir->path)) {
 
             // check if tmpfs or backup dir exists
             // if so, then attempt to move/copy tmpfs/backup to path
             // and use it as sync target
-            if (stat (dir->tmp_path, &sb) == 0 && S_ISDIR (sb.st_mode)) {
+            if (EXISTS (dir->tmp_path) && S_ISDIR (sb.st_mode)) {
                 if (copy_r (dir->tmp_path, dir->path) == -1) continue;
                 if (remove_r (dir->tmp_path) == -1) continue;
 
                 LOG (LOG_WARN, "path non-existent, but tmpfs path exists, "
                                "using tmpfs instead");
-            } else if (stat (dir->backup_path, &sb) == 0
-                       && S_ISDIR (sb.st_mode)) {
+            } else if (EXISTS (dir->backup_path) && S_ISDIR (sb.st_mode)) {
                 if (rename (dir->backup_path, dir->path) == -1) continue;
 
                 LOG (LOG_WARN, "path non-existent, but backup path exists, "
@@ -642,7 +643,7 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
         if (!S_ISDIR (sb.st_mode)) {
 
             // skip browser if it is a valid symlink
-            if (S_ISLNK (sb.st_mode) && stat (dir->path, &sb) == 0) {
+            if (S_ISLNK (sb.st_mode) && EXISTS (dir->path)) {
                 LOG (LOG_ERROR, "%s is a valid symlink, skipping %s",
                      dir->path, browsername);
                 abrt_browser = "firefox";
@@ -650,8 +651,7 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
             } else if (S_ISLNK (sb.st_mode)) {
                 // path is a dangling symlink
                 // attempt to use backups as sync target if it exists
-                if (stat (dir->backup_path, &sb) == 0
-                    && S_ISDIR (sb.st_mode)) {
+                if (EXISTS (dir->backup_path) && S_ISDIR (sb.st_mode)) {
 
                     LOG (LOG_WARN, "%s is a dangling symlink, using backups",
                          dir->path);
@@ -673,13 +673,13 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
         }
 
         // check if dir exists in tmpfs, if so recover
-        if (lstat (dir->tmp_path, &sb) == 0 && S_ISDIR (sb.st_mode)) {
+        if (EXISTS (dir->tmp_path) && S_ISDIR (sb.st_mode)) {
             LOG (LOG_WARN, "found %s in tmpfs dir, recovering", dir->dirname);
 
             if (recover_dir (dir->tmp_path, browsername) == -1) continue;
         }
         // check if dir exists in backups, if so recover
-        if (lstat (dir->backup_path, &sb) == 0 && S_ISDIR (sb.st_mode)) {
+        if (EXISTS (dir->backup_path) && S_ISDIR (sb.st_mode)) {
             LOG (LOG_WARN, "found %s in backup dir, recovering", dir->dirname);
 
             if (recover_dir (dir->backup_path, browsername) == -1) continue;
@@ -740,8 +740,8 @@ int do_resync (void) {
     do {
         LOG (LOG_DEBUG, "resyncing %s", dir->path);
 
-        // check if paths exist
-        if (stat (dir->path, &sb) == -1 || stat (dir->tmp_path, &sb) == -1) {
+        // check if path and tmpfs path does not exist
+        if (!EXISTS (dir->path) || !EXISTS (dir->tmp_path)) {
             LOG (LOG_WARN, "Cannot resync %s, required dirs don't exist",
                  dir->backup_path);
             continue;
@@ -785,13 +785,15 @@ int do_unsync (void) {
     do {
         LOG (LOG_DEBUG, "unsyncing %s", dir->path);
 
-        // check if directories exist
-        if (lstat (dir->path, &sb) == -1) {
+        // check if symlinks do not exist or are dangling
+        if (!LEXISTS (dir->path)) {
             LOG (LOG_WARN, "symlink for %s doesn't exist", dir->path);
-        } else if (S_ISLNK (sb.st_mode) && stat (dir->path, &sb) == -1) {
+
+        } else if (S_ISLNK (sb.st_mode) && !EXISTS (dir->path)) {
             LOG (LOG_WARN, "symlink for %s is dangling", dir->path);
-        }
-        if (lstat (dir->path, &sb) == 0 && S_ISDIR (sb.st_mode)) {
+
+        } else if (S_ISDIR (sb.st_mode)) {
+            // if path is not a symlink but a dir, recover
             LOG (LOG_WARN, "%s is a directory, recovering", dir->path);
             recover_dir (dir->path, browsername);
         }
