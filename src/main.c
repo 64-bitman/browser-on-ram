@@ -124,7 +124,7 @@ int main (int argc, char **argv) {
             err = 1;
             break;
         }
-        if (toggle_lock() == -1) return -1;
+        if (toggle_lock () == -1) return -1;
         err = do_sync (browsers, browsers_len) * -1;
         break;
     }
@@ -137,7 +137,7 @@ int main (int argc, char **argv) {
             break;
         }
         err = do_unsync () * -1;
-        if (toggle_lock() == -1) return -1;
+        if (toggle_lock () == -1) return -1;
         break;
     }
     case 'p':
@@ -202,13 +202,20 @@ void status (void) {
     if (dir == NULL) return;
 
     do {
+        int path_exists = stat (dir->path, &sb) == 0 ? true : false;
+        int tmp_exists = stat (dir->tmp_path, &sb) == 0 ? true : false;
+        int backup_exists = stat (dir->backup_path, &sb) == 0 ? true : false;
+
         printf ("\n");
         printf ("Browser:           %s\n", browsername);
-        printf ("Directory:         %s\n", dir->path);
+        printf ("Directory:         %s %s\n", dir->path,
+                (path_exists) ? "" : "(does not exist)");
         // clang-format off
         if (lock_exists) {
-        printf ("Tmpfs directory:   %s\n", dir->tmp_path);
-        printf ("Backup directory:  %s\n", dir->backup_path);
+        printf ("Tmpfs directory:   %s %s\n", dir->tmp_path,
+                (tmp_exists) ? "" : "(does not exist)");
+        printf ("Backup directory:  %s %s\n", dir->backup_path,
+                (backup_exists) ? "" : "(does not exist)");
         }
         // clang-format on
         printf ("Directory size:    %s\n",
@@ -401,13 +408,13 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         // read from shell script output
         char *cmd = print2string ("sh ./%s.sh", browsername);
 
-        CHECKALLOC(cmd, true);
+        CHECKALLOC (cmd, true);
         char *buf = NULL;
         size_t dirpath_size = 0;
         FILE *pp = popen (cmd, "r");
 
-        if (pp == NULL) { 
-            PERROR();
+        if (pp == NULL) {
+            PERROR ();
             return -1;
         }
         struct Dir *dirs = calloc (MAX_DIRS, sizeof (*dirs));
@@ -470,7 +477,7 @@ int get_browsers (char *rootpath, struct Browser **browsers,
         }
 
         if (ent->fts_info != FTS_D) continue;
-        // ignore erverything else
+        // ignore everything else
 
         if (ent->fts_level != 1 && ent->fts_level != 2) continue;
 

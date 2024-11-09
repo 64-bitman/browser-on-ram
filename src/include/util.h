@@ -26,6 +26,8 @@ extern int LOG_LEVEL;
 #define LOG_WARN 1
 #define LOG_ERROR 0
 
+#define EXISTS(path) stat (path, &sb) == 0
+
 #define LOG(level, format, ...)                                               \
     log_print (level, __FILE__, __LINE__, format, ##__VA_ARGS__)
 
