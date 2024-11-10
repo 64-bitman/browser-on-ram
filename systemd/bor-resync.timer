@@ -1,0 +1,8 @@
+[Unit]
+Description=Timer for browser-on-ram - 1Hour
+BindsTo=bor.service
+
+[Timer]
+OnUnitActiveSec=1h
+
+# vim: ft=systemd
