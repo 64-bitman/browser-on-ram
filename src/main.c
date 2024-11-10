@@ -111,8 +111,24 @@ int main (int argc, char **argv) {
         LOG (LOG_ERROR, "failed initializing directories");
         return 1;
     }
+    // TODO: add option to ignore specific directories
+    // TODO: look in /usr/share and /usr/local and xdg data dir for scripts
 
     int err = 0;
+
+    if (action == 's' || action == 'r' || action == 'u') {
+        // check if rsync is not available
+        if (system ("which rsync > /dev/null 2>&1")) {
+            LOG (LOG_ERROR, "could not find rsync, please install it");
+            return 1;
+        }
+
+        // exit if systemd service is active
+        if (systemd_userservice_active ("bor.service")) {
+            LOG (LOG_ERROR, "Systemd user service is active, aborting");
+            return 1;
+        }
+    }
 
     switch (action) {
     case 's': {
@@ -185,6 +201,7 @@ void status (void) {
         printf (RESET);
     }
     printf (BOLD "\n---Configured Directories---\n" RESET);
+    fflush (stdout);
 
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
@@ -209,8 +226,8 @@ void status (void) {
         int backup_exists = EXISTS (dir->backup_path) ? true : false;
 
         printf ("\n");
-        printf ("Browser:           "YELLOW"%s\n"RESET, browsername);
-        printf ("Directory:         "UNDERLINE"%s"RESET" %s\n", dir->path,
+        printf ("Browser:           " YELLOW "%s\n" RESET, browsername);
+        printf ("Directory:         " UNDERLINE "%s" RESET " %s\n", dir->path,
                 (path_exists) ? "" : "(does not exist)");
         if (lock_exists) {
             printf ("Tmpfs directory:   %s/" BOLD RED "%s" RESET " %s\n",
@@ -220,13 +237,15 @@ void status (void) {
                     CONFDIR_BACKUPSDIR, dir->dirname,
                     (backup_exists) ? "" : "(does not exist)");
         }
-        printf ("Directory size:    "GREEN"%s\n"RESET,
+        printf ("Directory size:    " GREEN "%s\n" RESET,
                 human_readable (get_dir_size (dir->path)));
 
     } while ((dir = walk_browsers (NULL, 0, &browsername)) != NULL);
 
     // print crash recovery dirs
     printf (BOLD "\n---Crash Recovery---\n" RESET);
+    fflush (stdout);
+
     browsers = NULL;
     browsers_len = 0;
     if (get_browsers (CONFDIR_CRASHDIR, &browsers, &browsers_len) == -1)
@@ -436,7 +455,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
             (browser.dirs_len)++;
         }
         if (browser.dirs_len == 0) {
-            LOG (LOG_WARN, "recieved no directories from %s", browsername);
+            LOG (LOG_DEBUG, "received no directories from %s", browsername);
         }
 
         free (cmd);
@@ -473,6 +492,11 @@ int get_browsers (char *rootpath, struct Browser **browsers,
     while ((ent = fts_read (ftsp)) != NULL) {
         if (ent->fts_info == FTS_DP && ent->fts_level == 1) {
             // add browser struct to array after init finished
+            if (browser.dirs_len == 0) {
+                LOG (LOG_DEBUG, "received no directories from %s",
+                     browser.name);
+            }
+
             (*browsers)[*browsers_len] = browser;
             (*browsers_len)++;
             continue;
@@ -485,6 +509,7 @@ int get_browsers (char *rootpath, struct Browser **browsers,
 
         if (ent->fts_level == 1 && ent->fts_info == FTS_D) {
             // browser dir
+            LOG (LOG_DEBUG, "got browser %s", ent->fts_name);
             browser.name = strdup (ent->fts_name);
             CHECKALLOC (browser.name, true);
 
@@ -494,6 +519,7 @@ int get_browsers (char *rootpath, struct Browser **browsers,
         } else if (ent->fts_level == 2) {
             // dir to sync
             ent->fts_path = replace_char (ent->fts_name, '\\', '/');
+            LOG (LOG_DEBUG, "received dir %s", ent->fts_path);
 
             struct Dir dir = create_dir_s (&(ent->fts_path), browser.name);
 
