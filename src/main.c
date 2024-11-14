@@ -111,8 +111,6 @@ int main (int argc, char **argv) {
         LOG (LOG_ERROR, "failed initializing directories");
         return 1;
     }
-    // TODO: add option to ignore specific directories
-    // TODO: look in /usr/share and /usr/local and xdg data dir for scripts
 
     int err = 0;
 
@@ -611,8 +609,9 @@ int recover_dir (const char *path, const char *browsername) {
 
 int do_sync (struct Browser *browsers, size_t browsers_len) {
     errno = 0;
-    // create browser dirs
     LOG (LOG_INFO, "starting sync");
+
+    // create browser dirs
     for (size_t b = 0; b < browsers_len; b++) {
         if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
         if (mkdir (browsers[b].name, 0755) == -1 && errno != EEXIST) return -1;

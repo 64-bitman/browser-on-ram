@@ -6,6 +6,7 @@ SRC_PATH := src
 OBJ_PATH := bin
 DEP_PATH := dep
 INCLUDE_PATH := ./src/include
+PREFIX := /usr/local
 
 TARGET_NAME := bor
 TARGET := $(BIN_PATH)/$(TARGET_NAME)
@@ -31,6 +32,11 @@ prebuild:
 clean:
 	rm -f $(CLEAN_LIST)
 
+install: all
+	install -Dm 755 bin/bor $(PREFIX)/bin/bor
+	install -dm 755 $(PREFIX)/share/bor/scripts
+	install -Dm 644 scripts/*.sh $(PREFIX)/share/bor/scripts
+
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
@@ -39,4 +45,4 @@ $(TARGET): $(OBJ)
 $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/$(notdir $(basename $@).d) -o $@ -c $<
 
-.PHONY: all clean rebuild prebuild debug
+.PHONY: all clean prebuild debug install
