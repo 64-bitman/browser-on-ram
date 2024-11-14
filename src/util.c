@@ -263,3 +263,35 @@ int systemd_userservice_active (const char *name) {
 
     return false;
 }
+
+int mkdir_p (const char *path, mode_t mode) {
+    errno = 0;
+    char *path_cpy = strdup (path);
+
+    if (path_cpy == NULL) return -1;
+
+    char *mkdir_path = strchr (path_cpy, '/');
+
+    while (mkdir_path != NULL) {
+        char prev_char = mkdir_path[1];
+
+        mkdir_path[1] = 0;
+
+        if (mkdir(path_cpy, mode) == -1 && errno != EEXIST) {
+            free (path_cpy);
+            return -1;
+        }
+
+        mkdir_path[1] = prev_char;
+
+        mkdir_path = strchr(mkdir_path + 1, '/');
+    }
+
+    if (mkdir(path_cpy, mode) == -1 && errno != EEXIST) {
+        free (path_cpy);
+        return -1;
+    }
+    free (path_cpy);
+
+    return 0;
+}

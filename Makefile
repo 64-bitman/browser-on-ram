@@ -37,6 +37,9 @@ install: all
 	install -dm 755 $(PREFIX)/share/bor/scripts
 	install -Dm 644 scripts/*.sh $(PREFIX)/share/bor/scripts
 
+sync: all
+	bin/bor -v --sync -i
+
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 

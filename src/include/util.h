@@ -15,6 +15,7 @@ off_t get_dir_size (const char *path);
 char *human_readable (off_t bytes);
 char *replace_char (char *str, char target, char replace);
 int systemd_userservice_active (const char *name);
+int mkdir_p (const char *path, mode_t mode);
 
 extern int LOG_LEVEL;
 
@@ -44,18 +45,6 @@ extern int LOG_LEVEL;
 #define YELLOW "\e[33m"
 #define BLUE "\e[34m"
 #define BLUE "\e[34m"
-
-#define CHECKALLOC(var, do_return)                                            \
-    do {                                                                      \
-        errno = 0;                                                            \
-        if (var == NULL) {                                                    \
-            LOG (LOG_ERROR, "memory allocation failed");                      \
-            PERROR ();                                                        \
-            if (do_return) {                                                  \
-                return -1;                                                    \
-            }                                                                 \
-        }                                                                     \
-    } while (0)
 
 #ifdef DEBUG
 
