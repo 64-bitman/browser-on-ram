@@ -43,15 +43,13 @@ struct Browser {
 };
 
 void help (void);
-void status (void);
+/* void status (void); */
 int toggle_lock (void);
 
 int initialize_dirs (void);
 struct Dir create_dir_s (char **buffer, const char *browsername);
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
-int get_browsers (char *rootpath, struct Browser **browsers,
-                  size_t *browsers_len);
 struct Dir *walk_browsers (struct Browser *browsers, size_t browsers_len,
                            char **browsername);
 int do_sync (struct Browser *browsers, size_t browsers_len);
@@ -155,7 +153,7 @@ int main (int argc, char **argv) {
         break;
     }
     case 'p':
-        status ();
+        /* status (); */
         break;
     }
     return err;
@@ -176,6 +174,7 @@ void help (void) {
 }
 // clang-format on
 
+/*
 void status (void) {
     errno = 0;
     if (chdir (CONFDIR) == -1) return;
@@ -257,6 +256,7 @@ void status (void) {
         printf ("\nBrowser:         %s", browsername);
     } while ((dir = walk_browsers (NULL, 0, &browsername)));
 }
+*/
 
 int toggle_lock (void) {
     errno = 0;
@@ -471,67 +471,6 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
     return 0;
 }
 
-// go through root and find dirs from each browser dir
-int get_browsers (char *rootpath, struct Browser **browsers,
-                  size_t *browsers_len) {
-    errno = 0;
-    if (*browsers == NULL) {
-        *browsers = calloc (MAX_BROWSERS, sizeof (**browsers));
-
-        CHECKALLOC (*browsers, true);
-    }
-
-    char *paths[] = { rootpath, NULL };
-
-    FTS *ftsp = fts_open (paths, FTS_PHYSICAL | FTS_XDEV, NULL);
-    struct Browser browser = { 0 };
-    FTSENT *ent = NULL;
-
-    while ((ent = fts_read (ftsp)) != NULL) {
-        if (ent->fts_info == FTS_DP && ent->fts_level == 1) {
-            // add browser struct to array after init finished
-            if (browser.dirs_len == 0) {
-                LOG (LOG_DEBUG, "received no directories from %s",
-                     browser.name);
-            }
-
-            (*browsers)[*browsers_len] = browser;
-            (*browsers_len)++;
-            continue;
-        }
-
-        if (ent->fts_info != FTS_D) continue;
-        // ignore everything else
-
-        if (ent->fts_level != 1 && ent->fts_level != 2) continue;
-
-        if (ent->fts_level == 1 && ent->fts_info == FTS_D) {
-            // browser dir
-            LOG (LOG_DEBUG, "got browser %s", ent->fts_name);
-            browser.name = strdup (ent->fts_name);
-            CHECKALLOC (browser.name, true);
-
-            browser.dirs = calloc (MAX_DIRS, sizeof (*(browser.dirs)));
-            CHECKALLOC (browser.dirs, true);
-
-        } else if (ent->fts_level == 2) {
-            // dir to sync
-            ent->fts_path = replace_char (ent->fts_name, '\\', '/');
-            LOG (LOG_DEBUG, "received dir %s", ent->fts_path);
-
-            struct Dir dir = create_dir_s (&(ent->fts_path), browser.name);
-
-            CHECKALLOC (dir.path, true);
-
-            browser.dirs[browser.dirs_len] = dir;
-            browser.dirs_len++;
-        }
-    }
-
-    fts_close (ftsp);
-
-    return 0;
-}
 
 struct Dir *walk_browsers (struct Browser *browsers, size_t browsers_len,
                            char **browsername) {
@@ -563,6 +502,7 @@ struct Dir *walk_browsers (struct Browser *browsers, size_t browsers_len,
         return NULL;
 }
 
+/*
 int recover_dir (const char *path, const char *browsername) {
     errno = 0;
     struct stat sb;
@@ -606,6 +546,7 @@ int recover_dir (const char *path, const char *browsername) {
 
     return 0;
 }
+*/
 
 int do_sync (struct Browser *browsers, size_t browsers_len) {
     errno = 0;
@@ -743,6 +684,7 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
     return 0;
 }
 
+/*
 int do_resync (void) {
     errno = 0;
     struct Browser *browsers = NULL;
@@ -843,3 +785,4 @@ int do_unsync (void) {
 
     return 0;
 }
+*/
