@@ -224,7 +224,6 @@ int initialize_dirs (void) {
     if (CONFDIR == NULL || CONFDIR_BACKUPSDIR == NULL || TMPDIR == NULL
         || SCRIPTDIR == NULL) {
         LOG (LOG_ERROR, "failed setting global vars");
-        PERROR ();
         return -1;
     }
 
@@ -268,7 +267,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
     if (*browsers == NULL) {
         *browsers = calloc (MAX_BROWSERS, sizeof (**browsers));
 
-        /* CHECKALLOC (*browsers, true); */
+        if (*browsers == NULL) return -1;
     }
     *browsers_len = 0;
 
@@ -288,7 +287,6 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
     if (conf_fp == NULL) {
         LOG (LOG_ERROR, "failed opening browsers.conf");
-        PERROR ();
         return -1;
     }
 
@@ -302,28 +300,48 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         // ignore comments (#)
         if (browsername[0] == '#') continue;
 
-        LOG (LOG_DEBUG, "got browser %s", browsername);
 
         if (chdir (SCRIPTDIR) == -1) return -1;
 
-        // read from shell script output
         char *cmd = print2string ("exec sh ./%s.sh", browsername);
-
-        /* CHECKALLOC (cmd, true); */
+        if (cmd == NULL) return -1;
 
         char *buf = NULL;
         size_t dirpath_size = 0;
         FILE *pp = popen (cmd, "r");
 
-        if (pp == NULL) {
-            PERROR ();
-            return -1;
-        }
+        if (pp == NULL) return -1;
 
+        struct Browser browser = { 
+            .name = strdup (browsername),
+            .dirs = calloc (MAX_DIRS, sizeof (*(browser.dirs))),
+            .dirs_len = 0
+        };
+        if (browser.name == NULL) return -1;
+        if (browser.dirs == NULL) return -1;
+
+        LOG (LOG_DEBUG, "got browser %s", browser.name);
+
+        // read from shell script output
         while (getline (&buf, &dirpath_size, pp) != -1) {
             buf = trim (buf);
-            LOG (LOG_DEBUG, "received dir %s", buf);
+
+            struct Dir dir = {
+                .path = strdup(buf),
+                .exists = (stat(buf,&sb) == 0) ? true : false,
+                .dirname = strdup(basename(buf))
+            };
+            if (dir.path == NULL) return -1;
+            if (dir.dirname == NULL) return -1;
+
+            LOG (LOG_DEBUG, "received dir %s", dir.path);
+
+            browser.dirs[browser.dirs_len] = dir;
+            browser.dirs_len++;
         }
+
+        (*browsers)[*browsers_len] = browser;
+        (*browsers_len)++;
 
         free (cmd);
         free (buf);
@@ -342,6 +360,6 @@ int do_sync (struct Browser *browsers, size_t browsers_len) {
 
     // create browser dirs
 
-    /* LOG(LOG_DEBUG, "%s %d", browsers[0].dirs[0].path, browsers_len); */
+    LOG(LOG_DEBUG, "%s", browsers[0].dirs[0].path);
     return 0;
 }
