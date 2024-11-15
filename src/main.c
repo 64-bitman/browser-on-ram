@@ -24,14 +24,13 @@ static char *HOMEDIR = NULL;
 static char *CONFDIR = NULL;
 static char *CONFDIR_BACKUPSDIR = NULL;
 static char *CONFDIR_CRASHDIR = NULL;
-static char *TMPDIR = NULL;
+static char *TMPFSDIR = NULL;
 static char *SCRIPTDIR = NULL;
 static int IGNORE_CHECK = false;
 
 struct Dir {
     char *dirname;
     char *path;
-    int exists;
 };
 
 struct Browser {
@@ -46,11 +45,10 @@ int toggle_lock (void);
 
 int initialize_dirs (void);
 struct Dir create_dir_s (char **buffer, const char *browsername);
-int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
-int do_sync (struct Browser *browsers, size_t browsers_len);
-/* int do_resync (void); */
-/* int do_unsync (void); */
+int do_action (int action);
+int recover_dir (const char *path, const char *browsername);
+int sync_dir (const struct Dir dir, const char *browsername);
 
 int main (int argc, char **argv) {
     srand (time (NULL));
@@ -120,38 +118,12 @@ int main (int argc, char **argv) {
             LOG (LOG_ERROR, "Systemd user service is active, aborting");
             return 1;
         }
+        do_action (action);
     }
 
-    switch (action) {
-    case 's': {
-        struct Browser *browsers = NULL;
-        size_t browsers_len = 0;
+    if (action == 'p') {
+    }
 
-        if (read_browsersconf (&browsers, &browsers_len) == -1) {
-            LOG (LOG_ERROR, "failed reading browser.conf");
-            err = 1;
-            break;
-        }
-        if (toggle_lock () == -1) return -1;
-        err = do_sync (browsers, browsers_len) * -1;
-        break;
-    }
-    case 'r':
-        /* err = do_resync () * -1; */
-        break;
-    case 'u': {
-        /* if (do_resync () == -1) { */
-        /*     err = 1; */
-        /*     break; */
-        /* } */
-        /* err = do_unsync () * -1; */
-        if (toggle_lock () == -1) return -1;
-        break;
-    }
-    case 'p':
-        /* status (); */
-        break;
-    }
     return err;
 }
 // clang-format off
@@ -214,14 +186,14 @@ int initialize_dirs (void) {
     char *xdgruntimedir = getenv ("XDG_RUNTIME_DIR");
 
     if (xdgruntimedir == NULL) {
-        TMPDIR = print2string ("/run/user/%d/bor", pw->pw_uid);
+        TMPFSDIR = print2string ("/run/user/%d/bor", pw->pw_uid);
     } else {
-        TMPDIR = print2string ("%s/bor", xdgruntimedir);
+        TMPFSDIR = print2string ("%s/bor", xdgruntimedir);
     }
 
     SCRIPTDIR = strdup (SHAREDIR "/bor/scripts");
 
-    if (CONFDIR == NULL || CONFDIR_BACKUPSDIR == NULL || TMPDIR == NULL
+    if (CONFDIR == NULL || CONFDIR_BACKUPSDIR == NULL || TMPFSDIR == NULL
         || SCRIPTDIR == NULL) {
         LOG (LOG_ERROR, "failed setting global vars");
         return -1;
@@ -243,7 +215,7 @@ int initialize_dirs (void) {
     if (mkdir_p (CONFDIR, 0755) == -1) return -1;
     if (mkdir_p (CONFDIR_BACKUPSDIR, 0755) == -1) return -1;
     if (mkdir_p (CONFDIR_CRASHDIR, 0755) == -1) return -1;
-    if (mkdir_p (TMPDIR, 0755) == -1) return -1;
+    if (mkdir_p (TMPFSDIR, 0755) == -1) return -1;
 
     // create browser.conf template if it doesn't exist
     if (chdir (CONFDIR) == -1) return -1;
@@ -300,9 +272,18 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         // ignore comments (#)
         if (browsername[0] == '#') continue;
 
-
         if (chdir (SCRIPTDIR) == -1) return -1;
 
+        char *filename = print2string ("%s.sh", browsername);
+
+        if (!EXISTS (filename)) {
+            LOG (LOG_WARN, "script for %s does not exist, excluding browser",
+                 browsername);
+            free (filename);
+            continue;
+        }
+
+        free (filename);
         char *cmd = print2string ("exec sh ./%s.sh", browsername);
         if (cmd == NULL) return -1;
 
@@ -312,11 +293,10 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
         if (pp == NULL) return -1;
 
-        struct Browser browser = { 
-            .name = strdup (browsername),
-            .dirs = calloc (MAX_DIRS, sizeof (*(browser.dirs))),
-            .dirs_len = 0
-        };
+        struct Browser browser
+            = { .name = strdup (browsername),
+                .dirs = calloc (MAX_DIRS, sizeof (*(browser.dirs))),
+                .dirs_len = 0 };
         if (browser.name == NULL) return -1;
         if (browser.dirs == NULL) return -1;
 
@@ -326,11 +306,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         while (getline (&buf, &dirpath_size, pp) != -1) {
             buf = trim (buf);
 
-            struct Dir dir = {
-                .path = strdup(buf),
-                .exists = (stat(buf,&sb) == 0) ? true : false,
-                .dirname = strdup(basename(buf))
-            };
+            struct Dir dir
+                = { .path = strdup (buf), .dirname = strdup (basename (buf)) };
             if (dir.path == NULL) return -1;
             if (dir.dirname == NULL) return -1;
 
@@ -354,12 +331,166 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
     return 0;
 }
 
-int do_sync (struct Browser *browsers, size_t browsers_len) {
+int do_action (int action) {
+    struct Browser *browsers = NULL;
+    size_t browsers_len = 0;
+
+    if (read_browsersconf (&browsers, &browsers_len) == -1) {
+        LOG (LOG_ERROR, "failed reading browser.conf");
+        return -1;
+    }
+
     errno = 0;
-    LOG (LOG_INFO, "starting sync");
 
-    // create browser dirs
+    for (size_t b = 0; b < browsers_len; b++) {
+        struct Browser browser = browsers[b];
 
-    LOG(LOG_DEBUG, "%s", browsers[0].dirs[0].path);
+        if (chdir (CONFDIR_BACKUPSDIR) == -1) continue;
+        if (mkdir_p (browser.name, 0755) == -1) continue;
+        if (chdir (TMPFSDIR) == -1) continue;
+        if (mkdir_p (browser.name, 0755) == -1) continue;
+
+        for (size_t d = 0; d < browser.dirs_len; d++) {
+            struct Dir dir = browser.dirs[d];
+
+            if (action == 's') {
+                if (sync_dir (dir, browser.name) == -1) {
+                    PERROR ();
+                }
+            } else if (action == 'u') {
+
+            } else if (action == 'r') {
+            }
+        }
+    }
+    return 0;
+}
+
+int recover_dir (const char *path, const char *browsername) {
+    errno = 0;
+    int err = 0;
+    LOG (LOG_INFO, "recovering %s", path);
+
+    // move path to crash directory 
+    char *_path = strdup (path);
+    char *rlpath = realpath (path, NULL);
+    char *prevcwd = get_current_dir_name ();
+
+    if (_path == NULL || rlpath == NULL || prevcwd == NULL) {
+        err = -1;
+        goto exit;
+    }
+
+    if (chdir (CONFDIR_CRASHDIR) == -1 || mkdir_p (browsername, 0755) == -1
+        || chdir (browsername) == -1) {
+        err = -1;
+        goto exit;
+    }
+
+    char *uniq_name
+        = create_unique_filename (basename (_path), "-crashreport");
+
+    errno = 0;
+    if (move (rlpath, uniq_name) == -1) {
+        free (uniq_name);
+        err = -1;
+        goto exit;
+    }
+
+exit:
+    chdir (prevcwd);
+    free (_path);
+    free (rlpath);
+    free (prevcwd);
+    return err;
+}
+
+int sync_dir (const struct Dir dir, const char *browsername) {
+    errno = 0;
+    struct stat sb;
+
+    LOG (LOG_INFO, "syncing directory %s", dir.path);
+
+    /*
+       if directory doesn't exist, check if its in any other
+       known directories and move it back if it does exist
+       but there are other copies remaining, then recover
+       those copies
+    */
+
+    // prioritize tmpfs over backup
+    if (chdir (TMPFSDIR) == -1) return -1;
+    if (chdir (browsername) == -1) return -1;
+
+    if (DIREXISTS (dir.dirname)) {
+        LOG (LOG_WARN, "found tmpfs copy of directory");
+        if (DIREXISTS (dir.path)) {
+            if (recover_dir (dir.dirname, browsername) == -1) {
+                PERROR ();
+                LOG (LOG_ERROR, "failed recovering tmpfs", dir.dirname);
+                return -1;
+            }
+        } else {
+            LOG (LOG_INFO, "directory doesn't exist, using tmpfs instead");
+
+            if (remove (dir.path) == -1) return -1;
+            if (move (dir.dirname, dir.path) == -1) return -1;
+        }
+    }
+    remove (dir.dirname);
+
+    if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
+    if (chdir (browsername) == -1) return -1;
+
+    if (DIREXISTS (dir.dirname)) {
+        LOG (LOG_WARN, "found backup copy of directory");
+        if (DIREXISTS (dir.path)) {
+            if (recover_dir (dir.dirname, browsername) == -1) {
+                LOG (LOG_ERROR, "failed recovering backup", dir.dirname);
+                return -1;
+            }
+        } else {
+            LOG (LOG_INFO, "directory doesn't exist, using backup instead");
+
+            if (remove (dir.path) == -1) return -1;
+            if (move (dir.dirname, dir.path) == -1) return -1;
+        }
+    }
+    remove (dir.dirname);
+
+    /*
+       1. copy directory to tmpfs
+       2. move directory to backups
+       3. symlink directory to tmpfs
+    */
+
+    if (chdir (TMPFSDIR) == -1) return -1;
+    if (chdir (browsername) == -1) return -1;
+
+    if (copy_r (dir.path, dir.dirname) == -1) {
+        LOG (LOG_ERROR, "failed copying directory to tmpfs");
+        return -1;
+    }
+
+    char *tmpfs_rlpath = realpath (dir.dirname, NULL);
+
+    if (chdir (CONFDIR_BACKUPSDIR) == -1 || chdir (browsername) == -1) {
+        free (tmpfs_rlpath);
+        return -1;
+    }
+
+    if (move (dir.path, dir.dirname) == -1) {
+        LOG (LOG_ERROR, "failed moving directory to backups");
+        free (tmpfs_rlpath);
+        return -1;
+    }
+
+    if (symlink (tmpfs_rlpath, dir.path) == -1) {
+        LOG (LOG_ERROR, "failed creating symlink");
+        free (tmpfs_rlpath);
+        return -1;
+    }
+
+    free (tmpfs_rlpath);
     return 0;
 }

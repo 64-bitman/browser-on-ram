@@ -277,21 +277,41 @@ int mkdir_p (const char *path, mode_t mode) {
 
         mkdir_path[1] = 0;
 
-        if (mkdir(path_cpy, mode) == -1 && errno != EEXIST) {
+        if (mkdir (path_cpy, mode) == -1 && errno != EEXIST) {
             free (path_cpy);
             return -1;
         }
 
         mkdir_path[1] = prev_char;
 
-        mkdir_path = strchr(mkdir_path + 1, '/');
+        mkdir_path = strchr (mkdir_path + 1, '/');
     }
 
-    if (mkdir(path_cpy, mode) == -1 && errno != EEXIST) {
+    if (mkdir (path_cpy, mode) == -1 && errno != EEXIST) {
         free (path_cpy);
         return -1;
     }
     free (path_cpy);
 
+    return 0;
+}
+
+int move (const char *oldpath, const char *newpath) {
+    errno = 0;
+    struct stat sb;
+
+    if (stat (newpath, &sb) == 0) {
+        errno = EEXIST;
+        return -1;
+    }
+
+    if (rename (oldpath, newpath) == -1) {
+        if (errno != EXDEV) return -1;
+    } else {
+        return 0;
+    }
+    // if on different mount points, copy it then delete old
+    if (copy_r (oldpath, newpath) == -1) return -1;
+    if (remove_r(oldpath) == -1) return -1;
     return 0;
 }

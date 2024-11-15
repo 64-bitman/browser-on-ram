@@ -16,6 +16,7 @@ char *human_readable (off_t bytes);
 char *replace_char (char *str, char target, char replace);
 int systemd_userservice_active (const char *name);
 int mkdir_p (const char *path, mode_t mode);
+int move (const char *oldpath, const char *newpath);
 
 extern int LOG_LEVEL;
 
@@ -28,6 +29,7 @@ extern int LOG_LEVEL;
 #define LOG_ERROR 0
 
 #define EXISTS(path) (stat (path, &sb) == 0)
+#define DIREXISTS(path) (lstat (path, &sb) == 0 && S_ISDIR (sb.st_mode))
 #define LEXISTS(path) (lstat (path, &sb) == 0)
 
 #define LOG(level, format, ...)                                               \
