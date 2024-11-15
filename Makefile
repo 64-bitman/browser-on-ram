@@ -38,7 +38,13 @@ install: all
 	install -Dm 644 scripts/*.sh $(PREFIX)/share/bor/scripts
 
 sync: debug
-	bin/bor -v --sync -i
+	bin/bor -vi --sync
+
+unsync: debug
+	bin/bor -vi --unsync
+
+resync: debug
+	bin/bor -vi --resync
 
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
@@ -48,4 +54,4 @@ $(TARGET): $(OBJ)
 $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/$(notdir $(basename $@).d) -o $@ -c $<
 
-.PHONY: all clean prebuild debug install
+.PHONY: all clean prebuild debug install sync unsync resync

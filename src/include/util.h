@@ -30,6 +30,7 @@ extern int LOG_LEVEL;
 
 #define EXISTS(path) (stat (path, &sb) == 0)
 #define DIREXISTS(path) (lstat (path, &sb) == 0 && S_ISDIR (sb.st_mode))
+#define SYMEXISTS(path) (lstat (path, &sb) == 0 && S_ISLNK (sb.st_mode))
 #define LEXISTS(path) (lstat (path, &sb) == 0)
 
 #define LOG(level, format, ...)                                               \

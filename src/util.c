@@ -120,10 +120,9 @@ int remove_r (const char *path) {
         if (ent->fts_info == FTS_D || ent->fts_info == FTS_ERR) {
             continue;
         }
-        chmod (ent->fts_name, 0666);
+        chmod (ent->fts_name, 0755);
         remove (ent->fts_name);
     }
-    remove (path);
 
     fts_close (ftsp);
     if (chdir (prevcwd) == -1) {
@@ -131,6 +130,11 @@ int remove_r (const char *path) {
         return -1;
     }
     free (prevcwd);
+
+    chmod (path, 0755);
+    if (remove (path) == -1) {
+        return -1;
+    }
 
     return 0;
 }
@@ -312,6 +316,6 @@ int move (const char *oldpath, const char *newpath) {
     }
     // if on different mount points, copy it then delete old
     if (copy_r (oldpath, newpath) == -1) return -1;
-    if (remove_r(oldpath) == -1) return -1;
+    if (remove_r (oldpath) == -1) return -1;
     return 0;
 }

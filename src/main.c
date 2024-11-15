@@ -47,8 +47,10 @@ int initialize_dirs (void);
 struct Dir create_dir_s (char **buffer, const char *browsername);
 
 int do_action (int action);
-int recover_dir (const char *path, const char *browsername);
+int recover (const char *path, const char *browsername);
+
 int sync_dir (const struct Dir dir, const char *browsername);
+int unsync_dir (const struct Dir dir, const char *browsername);
 
 int main (int argc, char **argv) {
     srand (time (NULL));
@@ -358,7 +360,9 @@ int do_action (int action) {
                     PERROR ();
                 }
             } else if (action == 'u') {
-
+                if (unsync_dir (dir, browser.name) == -1) {
+                    PERROR ();
+                }
             } else if (action == 'r') {
             }
         }
@@ -366,12 +370,16 @@ int do_action (int action) {
     return 0;
 }
 
-int recover_dir (const char *path, const char *browsername) {
+int recover (const char *path, const char *browsername) {
     errno = 0;
     int err = 0;
+    struct stat sb;
+
+    if (stat (path, &sb) == -1) return -1;
+
     LOG (LOG_INFO, "recovering %s", path);
 
-    // move path to crash directory 
+    // move path to crash directory
     char *_path = strdup (path);
     char *rlpath = realpath (path, NULL);
     char *prevcwd = get_current_dir_name ();
@@ -424,16 +432,14 @@ int sync_dir (const struct Dir dir, const char *browsername) {
 
     if (DIREXISTS (dir.dirname)) {
         LOG (LOG_WARN, "found tmpfs copy of directory");
-        if (DIREXISTS (dir.path)) {
-            if (recover_dir (dir.dirname, browsername) == -1) {
-                PERROR ();
-                LOG (LOG_ERROR, "failed recovering tmpfs", dir.dirname);
+        if (EXISTS (dir.path)) {
+            if (recover (dir.dirname, browsername) == -1) {
+                LOG (LOG_ERROR, "failed recovering tmpfs");
                 return -1;
             }
         } else {
             LOG (LOG_INFO, "directory doesn't exist, using tmpfs instead");
 
-            if (remove (dir.path) == -1) return -1;
             if (move (dir.dirname, dir.path) == -1) return -1;
         }
     }
@@ -444,15 +450,14 @@ int sync_dir (const struct Dir dir, const char *browsername) {
 
     if (DIREXISTS (dir.dirname)) {
         LOG (LOG_WARN, "found backup copy of directory");
-        if (DIREXISTS (dir.path)) {
-            if (recover_dir (dir.dirname, browsername) == -1) {
-                LOG (LOG_ERROR, "failed recovering backup", dir.dirname);
+        if (EXISTS (dir.path)) {
+            if (recover (dir.dirname, browsername) == -1) {
+                LOG (LOG_ERROR, "failed recovering backup");
                 return -1;
             }
         } else {
             LOG (LOG_INFO, "directory doesn't exist, using backup instead");
 
-            if (remove (dir.path) == -1) return -1;
             if (move (dir.dirname, dir.path) == -1) return -1;
         }
     }
@@ -492,5 +497,62 @@ int sync_dir (const struct Dir dir, const char *browsername) {
     }
 
     free (tmpfs_rlpath);
+    return 0;
+}
+
+int unsync_dir (const struct Dir dir, const char *browsername) {
+    errno = 0;
+    struct stat sb;
+
+    LOG (LOG_INFO, "unsyncing directory %s", dir.path);
+
+    /*
+       1. remove symlink
+       2. copy tmpfs over to directory path
+       3. remove backup
+    */
+
+    if (!SYMEXISTS (dir.path)) {
+        if (LEXISTS (dir.path)) {
+            LOG (LOG_WARN, "symlink is not actually a symlink");
+
+            if (recover (dir.path, browsername) == -1) {
+                LOG (LOG_ERROR, "failed recovering path");
+                return -1;
+            }
+        } else {
+            LOG (LOG_WARN, "symlink does not exist");
+            return -1;
+        }
+    }
+
+    char *tmpfs_path = realpath (dir.path, NULL);
+
+    if (tmpfs_path == NULL) return -1;
+
+    if (remove (dir.path) == -1) {
+        LOG (LOG_ERROR, "failed removing symlink");
+        free (tmpfs_path);
+        return -1;
+    }
+    if (move (tmpfs_path, dir.path) == -1) {
+        LOG (LOG_ERROR, "failed moving tmpfs to directory location");
+        free (tmpfs_path);
+        return -1;
+    }
+
+    if (chdir (CONFDIR_BACKUPSDIR) == -1 || chdir (browsername) == -1) {
+        free (tmpfs_path);
+        return -1;
+    }
+
+    if (remove_r (dir.dirname) == -1) {
+        LOG (LOG_ERROR, "failed removing backup");
+        free (tmpfs_path);
+        return -1;
+    }
+
+    free (tmpfs_path);
+
     return 0;
 }
