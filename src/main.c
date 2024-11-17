@@ -51,6 +51,7 @@ int recover (const char *path, const char *browsername);
 
 int sync_dir (const struct Dir dir, const char *browsername);
 int unsync_dir (const struct Dir dir, const char *browsername);
+int resync_dir (const struct Dir dir, const char *browsername);
 
 int main (int argc, char **argv) {
     srand (time (NULL));
@@ -120,7 +121,11 @@ int main (int argc, char **argv) {
             LOG (LOG_ERROR, "Systemd user service is active, aborting");
             return 1;
         }
-        do_action (action);
+
+        if (do_action (action) == -1) {
+            LOG (LOG_ERROR, "failed attempting to sync/unsync/resync");
+            return 1;
+        }
     }
 
     if (action == 'p') {
@@ -334,6 +339,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 }
 
 int do_action (int action) {
+    errno = 0;
+
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
 
@@ -364,6 +371,9 @@ int do_action (int action) {
                     PERROR ();
                 }
             } else if (action == 'r') {
+                if (resync_dir (dir, browser.name) == -1) {
+                    PERROR ();
+                }
             }
         }
     }
@@ -491,6 +501,8 @@ int sync_dir (const struct Dir dir, const char *browsername) {
 
     char *tmpfs_rlpath = realpath (dir.dirname, NULL);
 
+    if (tmpfs_rlpath == NULL) return -1;
+
     if (chdir (CONFDIR_BACKUPSDIR) == -1 || chdir (browsername) == -1) {
         free (tmpfs_rlpath);
         return -1;
@@ -558,13 +570,44 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
         return -1;
     }
 
-    if (remove_r (dir.dirname) == -1) {
-        LOG (LOG_ERROR, "failed removing backup");
-        free (tmpfs_path);
-        return -1;
+    if (EXISTS(dir.dirname)) {
+        if (remove_r (dir.dirname) == -1) {
+            LOG (LOG_ERROR, "failed removing backup");
+            free (tmpfs_path);
+            return -1;
+        }
+    } else {
+        LOG (LOG_WARN, "did not find backup copy of directory");
     }
 
     free (tmpfs_path);
 
+    return 0;
+}
+
+int resync_dir (const struct Dir dir, const char *browsername) {
+    errno = 0;
+
+    LOG (LOG_INFO, "resyncing directory %s", dir.path);
+
+    /*
+        2. chdir to backups
+        1. get realpath of symlink (tmpfs dir)
+        3. copy tmpfs over
+    */
+    if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
+    if (chdir (browsername) == -1) return -1;
+
+    char *tmpfs_path = realpath (dir.path, NULL);
+
+    if (tmpfs_path == NULL) return -1;
+
+    if (copy_r(tmpfs_path, dir.dirname) == -1) {
+        LOG (LOG_ERROR, "failed syncing tmpfs to backups");
+        free(tmpfs_path);
+        return -1;
+    }
+
+    free (tmpfs_path);
     return 0;
 }
