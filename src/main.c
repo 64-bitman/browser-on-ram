@@ -372,6 +372,16 @@ int do_action (int action) {
 
     errno = 0;
 
+    // check if browsers proccesses are running
+    if (!IGNORE_CHECK) {
+        for (size_t i = 0; i < browsers_len; i++) {
+            if (pgrep (browsers[i].name) != -1 && action != 'r') {
+                LOG (LOG_ERROR, "%s is running, aborting", browsers[i].name);
+                return -1;
+            }
+        }
+    }
+
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
 
@@ -380,6 +390,8 @@ int do_action (int action) {
         if (mkdir_p (browser.name, 0755) == -1) continue;
         if (chdir (TMPFSDIR) == -1) continue;
         if (mkdir_p (browser.name, 0755) == -1) continue;
+
+        LOG (LOG_INFO, "syncing %s", browser.name);
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
