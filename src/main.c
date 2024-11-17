@@ -56,6 +56,7 @@ int resync_dir (const struct Dir dir, const char *browsername);
 int main (int argc, char **argv) {
     srand (time (NULL));
     errno = 0;
+    struct stat sb;
 
     struct option opts[] = { { "sync", no_argument, NULL, 's' },
                              { "unsync", no_argument, NULL, 'u' },
@@ -121,6 +122,18 @@ int main (int argc, char **argv) {
             LOG (LOG_ERROR, "Systemd user service is active, aborting");
             return 1;
         }
+        if (chdir(CONFDIR) == -1) return 1;
+        int lock_exists = EXISTS("lock");
+
+        if ((action == 'u' || action == 'r') && !lock_exists) {
+            LOG (LOG_ERROR, "cannot unsync/resync, lock does not exist");
+            return 1;
+        } else if (action == 's' && lock_exists) {
+            LOG (LOG_ERROR, "cannot sync, lock exists");
+            return 1;
+        }
+
+        if (action != 'r') toggle_lock();
 
         if (do_action (action) == -1) {
             LOG (LOG_ERROR, "failed attempting to sync/unsync/resync");
