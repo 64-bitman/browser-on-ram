@@ -40,8 +40,8 @@ struct Browser {
 };
 
 void help (void);
-/* void status (void); */
-int toggle_lock (void);
+void status (void);
+int set_lock (int status);
 
 int initialize_dirs (void);
 struct Dir create_dir_s (char **buffer, const char *browsername);
@@ -122,18 +122,24 @@ int main (int argc, char **argv) {
             LOG (LOG_ERROR, "Systemd user service is active, aborting");
             return 1;
         }
-        if (chdir(CONFDIR) == -1) return 1;
-        int lock_exists = EXISTS("lock");
+        if (chdir (CONFDIR) == -1) return 1;
+        int lock_exists = EXISTS ("lock");
 
-        if ((action == 'u' || action == 'r') && !lock_exists) {
-            LOG (LOG_ERROR, "cannot unsync/resync, lock does not exist");
-            return 1;
-        } else if (action == 's' && lock_exists) {
-            LOG (LOG_ERROR, "cannot sync, lock exists");
-            return 1;
+        if (!IGNORE_CHECK) {
+            if ((action == 'u' || action == 'r') && !lock_exists) {
+                LOG (LOG_ERROR, "cannot unsync/resync, lock does not exist");
+                return 1;
+            } else if (action == 's' && lock_exists) {
+                LOG (LOG_ERROR, "cannot sync, lock exists");
+                return 1;
+            }
         }
 
-        if (action != 'r') toggle_lock();
+        if (action == 's') {
+            set_lock (true);
+        } else if (action == 'u') {
+            set_lock (false);
+        }
 
         if (do_action (action) == -1) {
             LOG (LOG_ERROR, "failed attempting to sync/unsync/resync");
@@ -141,6 +147,7 @@ int main (int argc, char **argv) {
         }
     }
 
+    // status
     if (action == 'p') {
     }
 
@@ -154,7 +161,7 @@ void help (void) {
     printf ("-u, --unsync           unsync browsers\n");
     printf ("-r, --resync           resync browsers\n");
     printf ("-p, --status           show current status and configuration\n");
-    printf ("-i, --ignore           ignore safety checks\n");
+    printf ("-i, --ignore           ignore safety & lock checks\n");
     printf ("-v, --verbose          enable debug logs\n");
     printf ("-h, --help             show this message\n\n");
     printf ("It is not recommended to use sync, unsync, or resync standalone.\n");
@@ -162,25 +169,26 @@ void help (void) {
 }
 // clang-format on
 
-int toggle_lock (void) {
+int set_lock (int status) {
     errno = 0;
     if (chdir (CONFDIR) == -1) return -1;
 
-    struct stat sb;
-
-    if (EXISTS ("lock")) {
-        // lock exists, remove it
-        chmod ("lock", 0666);
-        if (remove ("lock") == -1) return -1;
-    } else {
-        // create lock
+    if (status) {
         int fd = creat ("lock", O_RDONLY);
+
+        if (fd == -1) return -1;
         fchmod (fd, 0444);
         close (fd);
+    } else {
+        chmod ("lock", 0666);
+        errno = 0;
+        if (unlink ("lock") == -1 && errno != ENOENT) return -1;
     }
 
     return 0;
 }
+
+void status (void) {}
 
 // init required dirs and create browsers.conf template
 int initialize_dirs (void) {
@@ -582,7 +590,7 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
         return -1;
     }
 
-    if (EXISTS(dir.dirname)) {
+    if (EXISTS (dir.dirname)) {
         if (remove_r (dir.dirname) == -1) {
             LOG (LOG_ERROR, "failed removing backup");
             free (tmpfs_path);
@@ -614,9 +622,9 @@ int resync_dir (const struct Dir dir, const char *browsername) {
 
     if (tmpfs_path == NULL) return -1;
 
-    if (copy_r(tmpfs_path, dir.dirname) == -1) {
+    if (copy_r (tmpfs_path, dir.dirname) == -1) {
         LOG (LOG_ERROR, "failed syncing tmpfs to backups");
-        free(tmpfs_path);
+        free (tmpfs_path);
         return -1;
     }
 
