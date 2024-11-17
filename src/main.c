@@ -539,15 +539,10 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
     if (!SYMEXISTS (dir.path)) {
         if (LEXISTS (dir.path)) {
             LOG (LOG_WARN, "symlink is not actually a symlink");
-
-            if (recover (dir.path, browsername) == -1) {
-                LOG (LOG_ERROR, "failed recovering path");
-                return -1;
-            }
         } else {
             LOG (LOG_WARN, "symlink does not exist");
-            return -1;
         }
+        return -1;
     }
 
     char *tmpfs_path = realpath (dir.path, NULL);
