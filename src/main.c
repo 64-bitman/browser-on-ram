@@ -354,6 +354,7 @@ int do_action (int action) {
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
 
+        // create directories to store dirs for browser
         if (chdir (CONFDIR_BACKUPSDIR) == -1) continue;
         if (mkdir_p (browser.name, 0755) == -1) continue;
         if (chdir (TMPFSDIR) == -1) continue;
@@ -364,14 +365,16 @@ int do_action (int action) {
 
             if (action == 's') {
                 if (sync_dir (dir, browser.name) == -1) {
-                    PERROR ();
+                    LOG (LOG_WARN, "failed syncing %s", dir.path);
                 }
             } else if (action == 'u') {
                 if (unsync_dir (dir, browser.name) == -1) {
+                    LOG (LOG_WARN, "failed unsyncing %s", dir.path);
                     PERROR ();
                 }
             } else if (action == 'r') {
                 if (resync_dir (dir, browser.name) == -1) {
+                    LOG (LOG_WARN, "failed resyncing %s", dir.path);
                     PERROR ();
                 }
             }
@@ -410,6 +413,7 @@ int recover (const char *path, const char *browsername) {
 
     errno = 0;
     if (move (rlpath, uniq_name) == -1) {
+        LOG (LOG_ERROR, "could not move directory to crash dir");
         free (uniq_name);
         err = -1;
         goto exit;
