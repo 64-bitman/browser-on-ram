@@ -575,9 +575,9 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
 
     if (!SYMEXISTS (dir.path)) {
         if (LEXISTS (dir.path)) {
-            LOG (LOG_WARN, "symlink is not actually a symlink");
+            LOG (LOG_ERROR, "symlink is not actually a symlink");
         } else {
-            LOG (LOG_WARN, "symlink does not exist");
+            LOG (LOG_ERROR, "symlink does not exist");
         }
         return -1;
     }
@@ -619,14 +619,24 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
 
 int resync_dir (const struct Dir dir, const char *browsername) {
     errno = 0;
+    struct stat sb;
 
     LOG (LOG_INFO, "resyncing directory %s", dir.path);
 
     /*
-        2. chdir to backups
-        1. get realpath of symlink (tmpfs dir)
+        1. chdir to backups
+        2. get realpath of symlink (tmpfs dir)
         3. copy tmpfs over
     */
+    if (!SYMEXISTS (dir.path)) {
+        if (LEXISTS (dir.path)) {
+            LOG (LOG_ERROR, "symlink is not actually a symlink");
+        } else {
+            LOG (LOG_ERROR, "symlink does not exist");
+        }
+        return -1;
+    }
+
     if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
