@@ -426,24 +426,33 @@ int sync_dir (const struct Dir dir, const char *browsername) {
        those copies
     */
 
-    // prioritize tmpfs over backup
+    if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
+    if (chdir (browsername) == -1) return -1;
+
+    int backup_exists = DIREXISTS (dir.dirname);
+
     if (chdir (TMPFSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
     if (DIREXISTS (dir.dirname)) {
         LOG (LOG_WARN, "found tmpfs copy of directory");
-        if (EXISTS (dir.path)) {
+
+        // if backup copy exists too, then prioritize tmpfs copy over it
+        if (EXISTS (dir.path) && !backup_exists) {
             if (recover (dir.dirname, browsername) == -1) {
                 LOG (LOG_ERROR, "failed recovering tmpfs");
                 return -1;
             }
         } else {
-            LOG (LOG_INFO, "directory doesn't exist, using tmpfs instead");
+            LOG (LOG_INFO, "using tmpfs copy instead of original directory");
 
+            errno = 0;
+            if (remove (dir.path) == -1 && errno != ENOENT) return -1;
+            ;
             if (move (dir.dirname, dir.path) == -1) return -1;
         }
     }
-    remove (dir.dirname);
+    remove (dir.dirname); // if dir.dirname is a file then delete it
 
     if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
@@ -456,8 +465,11 @@ int sync_dir (const struct Dir dir, const char *browsername) {
                 return -1;
             }
         } else {
-            LOG (LOG_INFO, "directory doesn't exist, using backup instead");
+            LOG (LOG_INFO,
+                 "directory doesn't exist, using backup copy instead");
 
+            if (remove (dir.path) == -1) return -1;
+            ;
             if (move (dir.dirname, dir.path) == -1) return -1;
         }
     }
