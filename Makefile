@@ -46,6 +46,9 @@ unsync: debug
 resync: debug
 	bin/bor -vi --resync
 
+status: debug
+	bin/bor --status
+
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
 
@@ -54,4 +57,4 @@ $(TARGET): $(OBJ)
 $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/$(notdir $(basename $@).d) -o $@ -c $<
 
-.PHONY: all clean prebuild debug install sync unsync resync
+.PHONY: all clean prebuild debug install sync unsync resync status

@@ -149,6 +149,7 @@ int main (int argc, char **argv) {
 
     // status
     if (action == 'p') {
+        status ();
     }
 
     return err;
@@ -188,7 +189,28 @@ int set_lock (int status) {
     return 0;
 }
 
-void status (void) {}
+void status (void) {
+    errno = 0;
+    struct stat sb;
+
+    printf ("Browser-on-RAM " VERSION "\n\n");
+
+    int service_active, timer_active;
+
+    service_active = systemd_userservice_active ("bor.service");
+    timer_active = systemd_userservice_active ("bor.timer");
+
+    if (chdir (CONFDIR) == -1) return;
+    int lock_exists = EXISTS ("lock");
+
+    printf ("Active:             %s\n", lock_exists ? "true" : "false");
+    printf ("Systemd service:    %s\n", service_active ? "true" : "false");
+    printf ("Systemd timer:      %s\n", timer_active ? "true" : "false");
+
+    printf("\nConfigured directories\n\n");
+
+    // impletement status
+}
 
 // init required dirs and create browsers.conf template
 int initialize_dirs (void) {
@@ -399,6 +421,7 @@ int do_action (int action) {
             if (action == 's') {
                 if (sync_dir (dir, browser.name) == -1) {
                     LOG (LOG_WARN, "failed syncing %s", dir.path);
+                    PERROR ();
                 }
             } else if (action == 'u') {
                 if (unsync_dir (dir, browser.name) == -1) {
