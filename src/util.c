@@ -210,7 +210,7 @@ off_t get_dir_size (const char *path) {
 
     while ((ent = fts_read (ftsp)) != NULL) {
         if (ent->fts_info == FTS_F || ent->fts_info == FTS_NSOK
-            || ent->fts_info == FTS_DEFAULT || ent->fts_info == FTS_D) {
+            || ent->fts_info == FTS_DEFAULT) {
             size += ent->fts_statp->st_size;
         }
     }

@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "util.h"
+#include <ctype.h>
 #include <dirent.h>
 #include <errno.h>
 #include <fcntl.h>
@@ -42,9 +43,9 @@ struct Browser {
 void help (void);
 void status (void);
 int set_lock (int status);
+int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
 int initialize_dirs (void);
-struct Dir create_dir_s (char **buffer, const char *browsername);
 
 int do_action (int action);
 int recover (const char *path, const char *browsername);
@@ -193,23 +194,55 @@ void status (void) {
     errno = 0;
     struct stat sb;
 
+    struct Browser *browsers = NULL;
+    size_t browsers_len = 0;
+
+    if (read_browsersconf (&browsers, &browsers_len) == -1) return;
+    if (chdir (CONFDIR) == -1) return; // for lock
+
     printf ("Browser-on-RAM " VERSION "\n\n");
 
-    int service_active, timer_active;
+    char *srv_active, *timer_active;
 
-    service_active = systemd_userservice_active ("bor.service");
-    timer_active = systemd_userservice_active ("bor.timer");
+    srv_active = systemd_userservice_active ("bor.service") ? "true" : "false";
+    timer_active = systemd_userservice_active ("bor.timer") ? "true" : "false";
 
-    if (chdir (CONFDIR) == -1) return;
-    int lock_exists = EXISTS ("lock");
+    char *lock_exists = EXISTS ("lock") ? "true" : "false";
 
-    printf ("Active:             %s\n", lock_exists ? "true" : "false");
-    printf ("Systemd service:    %s\n", service_active ? "true" : "false");
-    printf ("Systemd timer:      %s\n", timer_active ? "true" : "false");
+    printf ("%-20s%s\n", "Active:", lock_exists);
+    printf ("%-20s%s\n", "Systemd service:", srv_active);
+    printf ("%-20s%s\n", "Systemd timer:", timer_active);
 
     printf ("\nConfigured directories\n\n");
 
     // impletement status
+    char *buf = calloc (PATH_MAX + 1, sizeof (*buf));
+
+    if (buf == NULL) return;
+
+    for (size_t b = 0; b < browsers_len; b++) {
+
+        struct Browser browser = browsers[b];
+
+        printf ("%c%s:\n", toupper (browser.name[0]), browser.name + 1);
+
+        for (size_t d = 0; d < browser.dirs_len; d++) {
+            struct Dir dir = browser.dirs[d];
+            char *dir_size = human_readable (get_dir_size (dir.path));
+
+            printf ("%-20s%s\n", "Directory:", dir.path);
+
+            // get tmpfs path
+            snprintf (buf, PATH_MAX + 1, "%s/%s/%s", TMPFSDIR, browser.name,
+                      dir.dirname);
+
+            if (stat (buf, &sb) == 0) {
+                printf ("%-20s%s\n", "Tmpfs:", buf);
+            }
+
+            printf ("%-20s%s\n", "Directory size:", dir_size);
+        }
+    }
 }
 
 // init required dirs and create browsers.conf template
@@ -399,8 +432,6 @@ int do_action (int action) {
         LOG (LOG_ERROR, "failed reading browser.conf");
         return -1;
     }
-
-    errno = 0;
 
     // check if browsers proccesses are running
     if (!IGNORE_CHECK) {
