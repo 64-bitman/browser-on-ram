@@ -207,7 +207,7 @@ void status (void) {
     printf ("Systemd service:    %s\n", service_active ? "true" : "false");
     printf ("Systemd timer:      %s\n", timer_active ? "true" : "false");
 
-    printf("\nConfigured directories\n\n");
+    printf ("\nConfigured directories\n\n");
 
     // impletement status
 }
@@ -367,6 +367,10 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
             browser.dirs_len++;
         }
 
+        if (browser.dirs_len == 0) {
+            LOG (LOG_INFO, "no directories configured for %s", browser.name);
+        }
+
         (*browsers)[*browsers_len] = browser;
         (*browsers_len)++;
 
@@ -377,6 +381,10 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
     free (browsername);
     fclose (conf_fp);
+
+    if (*browsers_len == 0) {
+        LOG (LOG_INFO, "no browsers configured");
+    }
 
     return 0;
 }
