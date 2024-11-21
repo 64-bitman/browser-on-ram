@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 static char *loglevels_str[] = { "ERROR", "WARN", "INFO", "DEBUG" };
@@ -139,22 +140,16 @@ int remove_r (const char *path) {
     return 0;
 }
 
-// increment a number in given filename until filename is unique
-char *create_unique_filename (const char *filename, const char *str) {
-    char *new_filename = calloc (strlen (filename) + strlen (str) + 11,
-                                 sizeof (*new_filename));
-    struct stat sb;
-    size_t n = 1;
+char *filename_wtime (const char *filename, const char *str) {
+    const time_t t = time (NULL);
+    struct tm *tm = localtime (&t);
+    char *name = NULL;
 
-    if (new_filename == NULL) return NULL;
+    asprintf (&name, "%s%s_%d-%d-%dT%d:%d:%d", filename, str,
+              tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour,
+              tm->tm_min, tm->tm_sec);
 
-    do {
-        snprintf (new_filename, strlen (filename) + strlen (str) + 11,
-                  "%s%s%ld", filename, str, n);
-        n++;
-    } while (stat (new_filename, &sb) == 0);
-
-    return new_filename;
+    return name;
 }
 
 pid_t pgrep (const char *name) {

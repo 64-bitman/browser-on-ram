@@ -262,25 +262,25 @@ void status (void) {
 
             while ((de = readdir (dp)) != NULL) {
                 if (de->d_type == DT_DIR) {
-                    char *str_start = strstr(de->d_name, "-crashreport");
+                    char *str_start = strstr (de->d_name, "-crashreport");
 
                     // remove -crashreport* substring
                     if (str_start == NULL) continue;
                     char prevc = *str_start;
                     *str_start = 0;
 
-                    if (strcmp(de->d_name, dir.dirname) != 0) continue;
+                    if (strcmp (de->d_name, dir.dirname) != 0) continue;
 
                     *str_start = prevc;
-                    printf("%-20s%s/%s\n", "Crash directory:", buf, de->d_name);
-
+                    printf ("%-20s%s/%s\n", "Crash directory:", buf,
+                            de->d_name);
                 }
             }
 
-            closedir(dp);
+            closedir (dp);
         }
     }
-    free(buf);
+    free (buf);
 }
 
 // init required dirs and create browsers.conf template
@@ -542,7 +542,12 @@ int recover (const char *path, const char *browsername) {
     }
 
     char *uniq_name
-        = create_unique_filename (basename (_path), "-crashreport");
+        = filename_wtime (basename (_path), "-crashreport");
+
+    if (uniq_name == NULL) {
+        err = -1;
+        goto exit;
+    }
 
     errno = 0;
     if (move (rlpath, uniq_name) == -1) {

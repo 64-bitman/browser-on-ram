@@ -9,7 +9,7 @@ char *print2string (const char *format, ...);
 char *trim (char *str);
 int copy_r (const char *src, const char *dest);
 int remove_r (const char *path);
-char *create_unique_filename (const char *filename, const char *str);
+char *filename_wtime (const char *filename, const char *str);
 pid_t pgrep (const char *name);
 off_t get_dir_size (const char *path);
 char *human_readable (off_t bytes);
