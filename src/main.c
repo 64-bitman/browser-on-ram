@@ -228,9 +228,14 @@ void status (void) {
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
-            char *dir_size = human_readable (get_dir_size (dir.path));
+            off_t dir_size = get_dir_size (dir.path);
 
-            printf ("%-20s%s\n", "Directory:", dir.path);
+            if (dir_size != -1) {
+                printf ("%-20s%s\n", "Directory:", dir.path);
+            } else {
+                printf ("%-20s%s %s\n", "Directory:", dir.path,
+                        "(DOES NOT EXIST!)");
+            }
 
             // get tmpfs path
             snprintf (buf, PATH_MAX + 1, "%s/%s/%s", TMPFSDIR, browser.name,
@@ -240,7 +245,11 @@ void status (void) {
                 printf ("%-20s%s\n", "Tmpfs:", buf);
             }
 
-            printf ("%-20s%s\n", "Directory size:", dir_size);
+            if (dir_size != -1) {
+                char *human = human_readable (dir_size);
+                printf ("%-20s%s\n", "Directory size:", human);
+                free (human);
+            }
         }
     }
 }
