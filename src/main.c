@@ -250,8 +250,37 @@ void status (void) {
                 printf ("%-20s%s\n", "Directory size:", human);
                 free (human);
             }
+
+            // get any crash recovery directories
+            snprintf (buf, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR,
+                      browser.name);
+            DIR *dp = opendir (buf);
+
+            if (dp == NULL) return;
+
+            struct dirent *de = NULL;
+
+            while ((de = readdir (dp)) != NULL) {
+                if (de->d_type == DT_DIR) {
+                    char *str_start = strstr(de->d_name, "-crashreport");
+
+                    // remove -crashreport* substring
+                    if (str_start == NULL) continue;
+                    char prevc = *str_start;
+                    *str_start = 0;
+
+                    if (strcmp(de->d_name, dir.dirname) != 0) continue;
+
+                    *str_start = prevc;
+                    printf("%-20s%s/%s\n", "Crash directory:", buf, de->d_name);
+
+                }
+            }
+
+            closedir(dp);
         }
     }
+    free(buf);
 }
 
 // init required dirs and create browsers.conf template
