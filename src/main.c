@@ -388,10 +388,20 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
     }
 
     FILE *conf_fp = fopen ("browsers.conf", "r");
+    FILE *exclude_fp = NULL;
 
     if (conf_fp == NULL) {
         LOG (LOG_ERROR, "failed opening browsers.conf");
         return -1;
+    }
+
+    if (EXISTS ("exclude.conf")) {
+        exclude_fp = fopen ("exclude.conf", "r");
+
+        if (exclude_fp == NULL) {
+            LOG (LOG_ERROR, "failed opening exclude.conf");
+            return -1;
+        }
     }
 
     // read file
@@ -419,8 +429,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         char *cmd = print2string ("exec sh ./%s.sh", browsername);
         if (cmd == NULL) return -1;
 
-        char *buf = NULL;
-        size_t dirpath_size = 0;
+        char *buf = NULL, *ebuf = NULL;
+        size_t buf_size = 0, ebuf_size = 0;
         FILE *pp = popen (cmd, "r");
 
         if (pp == NULL) return -1;
@@ -434,9 +444,26 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
         LOG (LOG_DEBUG, "got browser %s", browser.name);
 
-        // read from shell script output
-        while (getline (&buf, &dirpath_size, pp) != -1) {
+        // read from shell script output (directories to sync)
+        while (getline (&buf, &buf_size, pp) != -1) {
             buf = trim (buf);
+
+            // ignore if directory configured to be excluded
+            if (exclude_fp != NULL) {
+                int exclude = false;
+
+                while (getline (&ebuf, &ebuf_size, exclude_fp) != -1) {
+                    ebuf = trim (ebuf);
+                    LOG (LOG_DEBUG, "%s", ebuf);
+                    if (strcmp(buf, ebuf) == 0) {
+                        exclude = true;
+                        break;
+                    }
+                }
+                rewind(exclude_fp);
+
+                if (exclude) continue;
+            }
 
             struct Dir dir
                 = { .path = strdup (buf), .dirname = strdup (basename (buf)) };
@@ -458,11 +485,13 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
         free (cmd);
         free (buf);
+        free (ebuf);
         pclose (pp);
     }
 
     free (browsername);
     fclose (conf_fp);
+    fclose (exclude_fp);
 
     if (*browsers_len == 0) {
         LOG (LOG_INFO, "no browsers configured");

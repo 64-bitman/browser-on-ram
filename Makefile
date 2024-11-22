@@ -47,7 +47,7 @@ resync: debug
 	bin/bor -vi --resync
 
 status: debug
-	bin/bor --status
+	bin/bor -vi --status
 
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
