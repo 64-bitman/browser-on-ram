@@ -16,10 +16,21 @@
 #include <time.h>
 #include <unistd.h>
 
+#ifndef SHAREDIR
 #define SHAREDIR "/usr/local/share"
-#define MAX_DIRS 1000
+#endif
+
+#ifndef MAX_DIRS
+#define MAX_DIRS 100
+#endif
+
+#ifndef MAX_BROWSERS 
 #define MAX_BROWSERS 100
+#endif
+
+#ifndef VERSION
 #define VERSION "v1.0"
+#endif
 
 static char *HOMEDIR = NULL;
 static char *CONFDIR = NULL;
@@ -541,8 +552,7 @@ int recover (const char *path, const char *browsername) {
         goto exit;
     }
 
-    char *uniq_name
-        = filename_wtime (basename (_path), "-crashreport");
+    char *uniq_name = filename_wtime (basename (_path), "-crashreport");
 
     if (uniq_name == NULL) {
         err = -1;
