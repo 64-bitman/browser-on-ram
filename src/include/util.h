@@ -51,23 +51,23 @@ extern int LOG_LEVEL;
 
 #ifdef DEBUG
 
-#define PERROR() perror (__FILE__ ":" TO_STRING (__LINE__) " Error");
-#define LOGCWD()                                                              \
-    do {                                                                      \
-        int perrno = errno;                                                   \
-        char *CWD = get_current_dir_name ();                                  \
-        LOG (LOG_DEBUG, "Current working directory is %s", CWD);              \
-        errno = perrno;                                                       \
-    } while (0)
+    #define PERROR() perror (__FILE__ ":" TO_STRING (__LINE__) " Error");
+    #define LOGCWD()                                                          \
+        do {                                                                  \
+            int perrno = errno;                                               \
+            char *CWD = get_current_dir_name ();                              \
+            LOG (LOG_DEBUG, "Current working directory is %s", CWD);          \
+            errno = perrno;                                                   \
+        } while (0)
 
 #else
 
-#define PERROR()                                                              \
-    do {                                                                      \
-    } while (0)
-#define LOGCWD()                                                              \
-    do {                                                                      \
-    } while (0)
+    #define PERROR()                                                          \
+        do {                                                                  \
+        } while (0)
+    #define LOGCWD()                                                          \
+        do {                                                                  \
+        } while (0)
 
 #endif
 #endif

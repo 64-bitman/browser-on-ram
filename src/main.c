@@ -17,19 +17,19 @@
 #include <unistd.h>
 
 #ifndef SHAREDIR
-#define SHAREDIR "/usr/local/share"
+    #define SHAREDIR "/usr/local/share"
 #endif
 
 #ifndef MAX_DIRS
-#define MAX_DIRS 100
+    #define MAX_DIRS 100
 #endif
 
-#ifndef MAX_BROWSERS 
-#define MAX_BROWSERS 100
+#ifndef MAX_BROWSERS
+    #define MAX_BROWSERS 100
 #endif
 
 #ifndef VERSION
-#define VERSION "v1.0"
+    #define VERSION "v1.0"
 #endif
 
 static char *HOMEDIR = NULL;
