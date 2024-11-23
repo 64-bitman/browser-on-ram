@@ -6,3 +6,4 @@ AlignAfterOpenBracket: Align
 AllowShortIfStatementsOnASingleLine: WithoutElse
 BreakBeforeBraces: Attach
 Language: Cpp
+IndentPPDirectives: BeforeHash

@@ -11,6 +11,7 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <time.h>
 #include <unistd.h>
 
 static char *loglevels_str[] = { "ERROR", "WARN", "INFO", "DEBUG" };
@@ -120,10 +121,9 @@ int remove_r (const char *path) {
         if (ent->fts_info == FTS_D || ent->fts_info == FTS_ERR) {
             continue;
         }
-        chmod (ent->fts_name, 0666);
+        chmod (ent->fts_name, 0755);
         remove (ent->fts_name);
     }
-    remove (path);
 
     fts_close (ftsp);
     if (chdir (prevcwd) == -1) {
@@ -132,25 +132,24 @@ int remove_r (const char *path) {
     }
     free (prevcwd);
 
+    chmod (path, 0755);
+    if (remove (path) == -1) {
+        return -1;
+    }
+
     return 0;
 }
 
-// increment a number in given filename until filename is unique
-char *create_unique_filename (const char *filename, const char *str) {
-    char *new_filename = calloc (strlen (filename) + strlen (str) + 11,
-                                 sizeof (*new_filename));
-    struct stat sb;
-    size_t n = 1;
+char *filename_wtime (const char *filename, const char *str) {
+    const time_t t = time (NULL);
+    struct tm *tm = localtime (&t);
+    char *name = NULL;
 
-    if (new_filename == NULL) return NULL;
+    asprintf (&name, "%s%s_%d-%d-%dT%d:%d:%d", filename, str,
+              tm->tm_year + 1900, tm->tm_mon + 1, tm->tm_mday, tm->tm_hour,
+              tm->tm_min, tm->tm_sec);
 
-    do {
-        snprintf (new_filename, strlen (filename) + strlen (str) + 11,
-                  "%s%s%ld", filename, str, n);
-        n++;
-    } while (stat (new_filename, &sb) == 0);
-
-    return new_filename;
+    return name;
 }
 
 pid_t pgrep (const char *name) {
@@ -206,7 +205,7 @@ off_t get_dir_size (const char *path) {
 
     while ((ent = fts_read (ftsp)) != NULL) {
         if (ent->fts_info == FTS_F || ent->fts_info == FTS_NSOK
-            || ent->fts_info == FTS_DEFAULT || ent->fts_info == FTS_D) {
+            || ent->fts_info == FTS_DEFAULT) {
             size += ent->fts_statp->st_size;
         }
     }
@@ -262,4 +261,56 @@ int systemd_userservice_active (const char *name) {
     }
 
     return false;
+}
+
+int mkdir_p (const char *path, mode_t mode) {
+    errno = 0;
+    char *path_cpy = strdup (path);
+
+    if (path_cpy == NULL) return -1;
+
+    char *mkdir_path = strchr (path_cpy, '/');
+
+    while (mkdir_path != NULL) {
+        char prev_char = mkdir_path[1];
+
+        mkdir_path[1] = 0;
+
+        if (mkdir (path_cpy, mode) == -1 && errno != EEXIST) {
+            free (path_cpy);
+            return -1;
+        }
+
+        mkdir_path[1] = prev_char;
+
+        mkdir_path = strchr (mkdir_path + 1, '/');
+    }
+
+    if (mkdir (path_cpy, mode) == -1 && errno != EEXIST) {
+        free (path_cpy);
+        return -1;
+    }
+    free (path_cpy);
+
+    return 0;
+}
+
+int move (const char *oldpath, const char *newpath) {
+    errno = 0;
+    struct stat sb;
+
+    if (stat (newpath, &sb) == 0) {
+        errno = EEXIST;
+        return -1;
+    }
+
+    if (rename (oldpath, newpath) == -1) {
+        if (errno != EXDEV) return -1;
+    } else {
+        return 0;
+    }
+    // if on different mount points, copy it then delete old
+    if (copy_r (oldpath, newpath) == -1) return -1;
+    if (remove_r (oldpath) == -1) return -1;
+    return 0;
 }
