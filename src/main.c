@@ -42,9 +42,14 @@ static int IGNORE_CHECK = false;
 static uid_t USERID = 0;
 static gid_t GROUPID = 0;
 
+enum DirType { TYPE_PROFILE = 1, TYPE_CACHE, TYPES_LEN};
+
+static const char *DirType_str[] = { NULL, "profile", "cache" };
+
 struct Dir {
     char *dirname;
     char *path;
+    enum DirType type;
 };
 
 struct Browser {
@@ -237,7 +242,7 @@ void status (void) {
 
         struct Browser browser = browsers[b];
 
-        printf ("%c%s:\n", toupper (browser.name[0]), browser.name + 1);
+        printf ("%c%s:\n\n", toupper (browser.name[0]), browser.name + 1);
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
@@ -289,6 +294,7 @@ void status (void) {
                             de->d_name);
                 }
             }
+            printf ("\n");
 
             closedir (dp);
         }
@@ -449,8 +455,27 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         LOG (LOG_DEBUG, "got browser %s", browser.name);
 
         // read from shell script output (directories to sync)
+        // format: <dirtype> <path>
         while (getline (&buf, &buf_size, pp) != -1) {
             buf = trim (buf);
+
+            char *delim = strchr (buf, ' ');
+            char *typestr = buf, *path = delim + 1;
+            enum DirType type = 0;
+
+            *delim = 0;
+
+            for (int i = 1; i < TYPES_LEN; i++) {
+                if (strcmp(typestr, DirType_str[i]) == 0) {
+                    type = i;
+                    break;
+                }
+            }
+
+            if (type == 0) {
+                LOG (LOG_WARN, "Unknown directory type '%'", typestr);
+                continue;
+            }
 
             // ignore if directory configured to be excluded
             if (exclude_fp != NULL) {
@@ -458,7 +483,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
                 while (getline (&ebuf, &ebuf_size, exclude_fp) != -1) {
                     ebuf = trim (ebuf);
-                    if (strcmp (buf, ebuf) == 0) {
+                    if (strcmp (path, ebuf) == 0) {
                         exclude = true;
                         break;
                     }
@@ -468,12 +493,14 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
                 if (exclude) continue;
             }
 
-            struct Dir dir
-                = { .path = strdup (buf), .dirname = strdup (basename (buf)) };
+            struct Dir dir = { .path = strdup (path),
+                               .dirname = strdup (basename (buf)),
+                               .type = type };
+
             if (dir.path == NULL) return -1;
             if (dir.dirname == NULL) return -1;
 
-            LOG (LOG_DEBUG, "received dir %s", dir.path);
+            LOG (LOG_DEBUG, "received %s dir %s", DirType_str[type], dir.path);
 
             browser.dirs[browser.dirs_len] = dir;
             browser.dirs_len++;
@@ -621,9 +648,10 @@ int sync_dir (const struct Dir dir, const char *browsername) {
     */
 
     // exclude if uid and gid dont match
-    if (stat(dir.path, &sb) == 0) {
+    if (stat (dir.path, &sb) == 0) {
         if (sb.st_uid != USERID || sb.st_gid != GROUPID) {
-            LOG (LOG_ERROR, "Directory UID/GID does not match current user/group");
+            LOG (LOG_ERROR,
+                 "Directory UID/GID does not match current user/group");
             return -1;
         }
     }
