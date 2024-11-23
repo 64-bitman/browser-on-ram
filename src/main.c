@@ -454,7 +454,6 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
                 while (getline (&ebuf, &ebuf_size, exclude_fp) != -1) {
                     ebuf = trim (ebuf);
-                    LOG (LOG_DEBUG, "%s", ebuf);
                     if (strcmp(buf, ebuf) == 0) {
                         exclude = true;
                         break;
