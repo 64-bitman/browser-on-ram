@@ -42,7 +42,7 @@ static int IGNORE_CHECK = false;
 static uid_t USERID = 0;
 static gid_t GROUPID = 0;
 
-enum DirType { TYPE_PROFILE = 1, TYPE_CACHE, TYPES_LEN};
+enum DirType { TYPE_PROFILE = 1, TYPE_CACHE, TYPES_LEN };
 
 static const char *DirType_str[] = { NULL, "profile", "cache" };
 
@@ -468,7 +468,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
             *delim = 0;
 
             for (int i = 1; i < TYPES_LEN; i++) {
-                if (strcmp(typestr, DirType_str[i]) == 0) {
+                if (strcmp (typestr, DirType_str[i]) == 0) {
                     type = i;
                     break;
                 }
@@ -496,7 +496,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
             }
 
             struct Dir dir = { .path = strdup (path),
-                               .dirname = strdup (basename (buf)),
+                               .dirname = strdup (basename (path)),
                                .type = type };
 
             if (dir.path == NULL) return -1;
@@ -671,9 +671,14 @@ int sync_dir (const struct Dir dir, const char *browsername) {
 
         // if backup copy exists too, then prioritize tmpfs copy over it
         if (EXISTS (dir.path) && !backup_exists) {
-            if (recover (dir.dirname, browsername) == -1) {
-                LOG (LOG_ERROR, "failed recovering tmpfs");
-                return -1;
+            // only recover if its a profile directory
+            if (dir.type == TYPE_PROFILE) {
+                if (recover (dir.dirname, browsername) == -1) {
+                    LOG (LOG_ERROR, "failed recovering tmpfs");
+                    return -1;
+                }
+            } else {
+                LOG (LOG_ERROR, "directory is cache, removing it");
             }
         } else {
             LOG (LOG_INFO, "using tmpfs copy instead of original directory");
@@ -684,28 +689,32 @@ int sync_dir (const struct Dir dir, const char *browsername) {
             if (move (dir.dirname, dir.path) == -1) return -1;
         }
     }
-    remove (dir.dirname); // if dir.dirname is a file then delete it
+    // if dir.dirname is a file or cache dir then delete it
+    remove_r (dir.dirname);
 
-    if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
-    if (chdir (browsername) == -1) return -1;
+    // backups are only for profile dirs
+    if (dir.type == TYPE_PROFILE) {
+        if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
+        if (chdir (browsername) == -1) return -1;
 
-    if (DIREXISTS (dir.dirname)) {
-        LOG (LOG_WARN, "found backup copy of directory");
-        if (EXISTS (dir.path)) {
-            if (recover (dir.dirname, browsername) == -1) {
-                LOG (LOG_ERROR, "failed recovering backup");
-                return -1;
+        if (DIREXISTS (dir.dirname)) {
+            LOG (LOG_WARN, "found backup copy of directory");
+            if (EXISTS (dir.path)) {
+                if (recover (dir.dirname, browsername) == -1) {
+                    LOG (LOG_ERROR, "failed recovering backup");
+                    return -1;
+                }
+            } else {
+                LOG (LOG_INFO,
+                     "directory doesn't exist, using backup copy instead");
+
+                if (remove (dir.path) == -1) return -1;
+                ;
+                if (move (dir.dirname, dir.path) == -1) return -1;
             }
-        } else {
-            LOG (LOG_INFO,
-                 "directory doesn't exist, using backup copy instead");
-
-            if (remove (dir.path) == -1) return -1;
-            ;
-            if (move (dir.dirname, dir.path) == -1) return -1;
         }
+        remove_r (dir.dirname);
     }
-    remove (dir.dirname);
 
     if (!LEXISTS (dir.path)) {
         LOG (LOG_ERROR, "directory does not exist");
@@ -713,17 +722,29 @@ int sync_dir (const struct Dir dir, const char *browsername) {
     }
 
     /*
+       if profile:
        1. copy directory to tmpfs
        2. move directory to backups
        3. symlink directory to tmpfs
+
+       if cache:
+       1. move directory to tmpfs
+       3. symlink
     */
 
     if (chdir (TMPFSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
-    if (copy_r (dir.path, dir.dirname) == -1) {
-        LOG (LOG_ERROR, "failed copying directory to tmpfs");
-        return -1;
+    if (dir.type == TYPE_PROFILE) {
+        if (copy_r (dir.path, dir.dirname) == -1) {
+            LOG (LOG_ERROR, "failed copying directory to tmpfs");
+            return -1;
+        }
+    } else if (dir.type == TYPE_CACHE) {
+        if (move(dir.path, dir.dirname) == -1) {
+            LOG (LOG_ERROR, "failed moving directory to tmpfs");
+            return -1;
+        }
     }
 
     char *tmpfs_rlpath = realpath (dir.dirname, NULL);
@@ -735,10 +756,12 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         return -1;
     }
 
-    if (move (dir.path, dir.dirname) == -1) {
-        LOG (LOG_ERROR, "failed moving directory to backups");
-        free (tmpfs_rlpath);
-        return -1;
+    if (dir.type == TYPE_PROFILE) {
+        if (move (dir.path, dir.dirname) == -1) {
+            LOG (LOG_ERROR, "failed moving directory to backups");
+            free (tmpfs_rlpath);
+            return -1;
+        }
     }
 
     if (symlink (tmpfs_rlpath, dir.path) == -1) {
@@ -792,14 +815,16 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
         return -1;
     }
 
-    if (EXISTS (dir.dirname)) {
-        if (remove_r (dir.dirname) == -1) {
-            LOG (LOG_ERROR, "failed removing backup");
-            free (tmpfs_path);
-            return -1;
+    if (dir.type == TYPE_PROFILE) {
+        if (EXISTS (dir.dirname)) {
+            if (remove_r (dir.dirname) == -1) {
+                LOG (LOG_ERROR, "failed removing backup");
+                free (tmpfs_path);
+                return -1;
+            }
+        } else {
+            LOG (LOG_WARN, "did not find backup copy of directory");
         }
-    } else {
-        LOG (LOG_WARN, "did not find backup copy of directory");
     }
 
     free (tmpfs_path);
@@ -808,6 +833,11 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
 }
 
 int resync_dir (const struct Dir dir, const char *browsername) {
+    if (dir.type == TYPE_CACHE) {
+        LOG (LOG_DEBUG, "%s is cache, not resyncing", dir.path);
+        return 0;
+    }
+
     errno = 0;
     struct stat sb;
 
