@@ -248,6 +248,8 @@ void status (void) {
             struct Dir dir = browser.dirs[d];
             off_t dir_size = get_dir_size (dir.path);
 
+            printf ("%-20s%s\n", "Type:", DirType_str[dir.type]);
+
             if (dir_size != -1) {
                 printf ("%-20s%s\n", "Directory:", dir.path);
             } else {
