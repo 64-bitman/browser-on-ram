@@ -39,6 +39,8 @@ static char *CONFDIR_CRASHDIR = NULL;
 static char *TMPFSDIR = NULL;
 static char *SCRIPTDIR = NULL;
 static int IGNORE_CHECK = false;
+static uid_t USERID = 0;
+static gid_t GROUPID = 0;
 
 struct Dir {
     char *dirname;
@@ -56,7 +58,7 @@ void status (void);
 int set_lock (int status);
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
-int initialize_dirs (void);
+int init (void);
 
 int do_action (int action);
 int recover (const char *path, const char *browsername);
@@ -115,8 +117,8 @@ int main (int argc, char **argv) {
         return 0;
     }
 
-    if (initialize_dirs () == -1) {
-        LOG (LOG_ERROR, "failed initializing directories");
+    if (init () == -1) {
+        LOG (LOG_ERROR, "failed initializing");
         return 1;
     }
 
@@ -295,11 +297,13 @@ void status (void) {
 }
 
 // init required dirs and create browsers.conf template
-int initialize_dirs (void) {
+int init (void) {
     errno = 0;
     struct passwd *pw = getpwuid (getuid ());
 
     HOMEDIR = strdup (pw->pw_dir);
+    USERID = pw->pw_uid;
+    GROUPID = pw->pw_gid;
 
     if (HOMEDIR == NULL) {
         return -1;
@@ -454,12 +458,12 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
                 while (getline (&ebuf, &ebuf_size, exclude_fp) != -1) {
                     ebuf = trim (ebuf);
-                    if (strcmp(buf, ebuf) == 0) {
+                    if (strcmp (buf, ebuf) == 0) {
                         exclude = true;
                         break;
                     }
                 }
-                rewind(exclude_fp);
+                rewind (exclude_fp);
 
                 if (exclude) continue;
             }
@@ -616,6 +620,14 @@ int sync_dir (const struct Dir dir, const char *browsername) {
        those copies
     */
 
+    // exclude if uid and gid dont match
+    if (stat(dir.path, &sb) == 0) {
+        if (sb.st_uid != USERID || sb.st_gid != GROUPID) {
+            LOG (LOG_ERROR, "Directory UID/GID does not match current user/group");
+            return -1;
+        }
+    }
+
     if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
@@ -664,6 +676,11 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         }
     }
     remove (dir.dirname);
+
+    if (!LEXISTS (dir.path)) {
+        LOG (LOG_ERROR, "directory does not exist");
+        return -1;
+    }
 
     /*
        1. copy directory to tmpfs
