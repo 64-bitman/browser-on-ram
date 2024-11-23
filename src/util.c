@@ -15,10 +15,9 @@
 #include <unistd.h>
 
 static char *loglevels_str[] = { "ERROR", "WARN", "INFO", "DEBUG" };
-int LOG_LEVEL = LOG_INFO;
+enum LogLevel LOG_LEVEL = LOG_INFO;
 
-// TODO: use enum for log level
-void log_print (int level, const char *file, const int line,
+void log_print (enum LogLevel level, const char *file, const int line,
                 const char *format, ...) {
     if (level > LOG_LEVEL) {
         return;

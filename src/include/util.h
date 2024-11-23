@@ -3,7 +3,11 @@
 
 #include <sys/types.h>
 
-void log_print (int level, const char *file, const int line,
+enum LogLevel { LOG_ERROR, LOG_WARN, LOG_INFO, LOG_DEBUG };
+
+extern enum LogLevel LOG_LEVEL;
+
+void log_print (enum LogLevel level, const char *file, const int line,
                 const char *format, ...);
 char *print2string (const char *format, ...);
 char *trim (char *str);
@@ -18,15 +22,8 @@ int systemd_userservice_active (const char *name);
 int mkdir_p (const char *path, mode_t mode);
 int move (const char *oldpath, const char *newpath);
 
-extern int LOG_LEVEL;
-
 #define __TO_STRING(s) #s
 #define TO_STRING(s) __TO_STRING (s)
-
-#define LOG_DEBUG 3
-#define LOG_INFO 2
-#define LOG_WARN 1
-#define LOG_ERROR 0
 
 #define EXISTS(path) (stat (path, &sb) == 0)
 #define DIREXISTS(path) (lstat (path, &sb) == 0 && S_ISDIR (sb.st_mode))
