@@ -33,9 +33,11 @@ clean:
 	rm -f $(CLEAN_LIST)
 
 install: all
-	install -Dm 755 bin/bor $(PREFIX)/bin/bor
 	install -dm 755 $(PREFIX)/share/bor/scripts
-	install -Dm 644 scripts/*.sh $(PREFIX)/share/bor/scripts
+	install -dm 755 $(PREFIX)/lib/systemd/user
+	install -Dm 755 bin/bor $(PREFIX)/bin/bor
+	install -Dm 644 scripts/browsers/*.sh $(PREFIX)/share/bor/scripts
+	install -Dm 644 systemd/* $(PREFIX)/lib/systemd/user
 
 sync: debug
 	bin/bor -vi --sync
