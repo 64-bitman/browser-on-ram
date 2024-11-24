@@ -154,15 +154,15 @@ int main (int argc, char **argv) {
             }
         }
 
+        if (do_action (action) == -1) {
+            LOG (LOG_ERROR, "failed attempting to sync/unsync/resync");
+            return 1;
+        }
+
         if (action == 's') {
             set_lock (true);
         } else if (action == 'u') {
             set_lock (false);
-        }
-
-        if (do_action (action) == -1) {
-            LOG (LOG_ERROR, "failed attempting to sync/unsync/resync");
-            return 1;
         }
     }
 
