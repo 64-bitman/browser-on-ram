@@ -1,12 +1,13 @@
+PREFIX := /usr/local
+
 CC := gcc
-CFLAGS := -Wextra -Wall -Wshadow -std=gnu11 -O2
+CFLAGS := -Wextra -Wall -Wshadow -std=gnu11 -O2 -DSHAREDIR=\"$(PREFIX)/share\"
 DEBUGFLAGS := -ggdb -g3 -DDEBUG
 BIN_PATH := bin
 SRC_PATH := src
 OBJ_PATH := bin
 DEP_PATH := dep
 INCLUDE_PATH := ./src/include
-PREFIX := /usr/local
 
 TARGET_NAME := bor
 TARGET := $(BIN_PATH)/$(TARGET_NAME)

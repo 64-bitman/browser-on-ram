@@ -17,7 +17,7 @@
 #include <unistd.h>
 
 #ifndef SHAREDIR
-    #define SHAREDIR "/usr/local/share"
+    #define SHAREDIR "/usr/share"
 #endif
 
 #ifndef MAX_DIRS
@@ -523,7 +523,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
     free (browsername);
     fclose (conf_fp);
-    fclose (exclude_fp);
+
+    if (exclude_fp != NULL) fclose (exclude_fp);
 
     if (*browsers_len == 0) {
         LOG (LOG_INFO, "no browsers configured");
