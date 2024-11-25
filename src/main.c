@@ -121,21 +121,21 @@ int main (int argc, char **argv) {
                 PERROR ();
                 return 1;
             }
-            char *tmp = strdup(wp.we_wordv[0]);
+            char *tmp = strdup (wp.we_wordv[0]);
 
             if (tmp == NULL) return 1;
 
             // only get realpath of dirname of exp path, incase
-            // actual path doesn't exist
-            char *bn = basename(tmp);
-            char *dn_rlpath = realpath (dirname(wp.we_wordv[0]), NULL);
+            // exp path doesn't exist
+            char *bn = basename (tmp);
+            char *dn_rlpath = realpath (dirname (wp.we_wordv[0]), NULL);
 
-            if (dn_rlpath  == NULL) return 1;
-            CONFDIR = print2string("%s/%s", dn_rlpath, bn);
+            if (dn_rlpath == NULL) return 1;
+            CONFDIR = print2string ("%s/%s", dn_rlpath, bn);
 
-            wordfree(&wp);
-            free(tmp);
-            free(dn_rlpath);
+            wordfree (&wp);
+            free (tmp);
+            free (dn_rlpath);
 
             if (CONFDIR == NULL) {
                 PERROR ();
