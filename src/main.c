@@ -16,7 +16,6 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
-#include <wordexp.h>
 
 #ifndef SHAREDIR
     #define SHAREDIR "/usr/share"
@@ -85,6 +84,7 @@ int main (int argc, char **argv) {
                              { "status", no_argument, NULL, 'p' },
                              { "ignore", no_argument, NULL, 'i' },
                              { "config", required_argument, NULL, 'c' },
+                             { "sharedir", required_argument, NULL, 'd' },
                              { "verbose", no_argument, NULL, 'v' },
                              { "help", no_argument, NULL, 'h' },
                              { 0, 0, 0, 0 } };
@@ -92,7 +92,7 @@ int main (int argc, char **argv) {
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "surpivhc:", opts, &longindex))
+    while ((opt = getopt_long (argc, argv, "surpivhc:d:", opts, &longindex))
            != -1) {
         switch (opt) {
         case 's':
@@ -115,25 +115,17 @@ int main (int argc, char **argv) {
             break;
         case 'c': {
             // set config directory path
-            wordexp_t wp;
-
-            if (wordexp (optarg, &wp, WRDE_NOCMD) == -1) {
-                PERROR ();
-                return 1;
-            }
-            char *tmp = strdup (wp.we_wordv[0]);
-
+            char *tmp = strdup (optarg);
             if (tmp == NULL) return 1;
 
-            // only get realpath of dirname of exp path, incase
-            // exp path doesn't exist
+            // only get realpath of dirname of path, incase
+            // path doesn't exist
             char *bn = basename (tmp);
-            char *dn_rlpath = realpath (dirname (wp.we_wordv[0]), NULL);
+            char *dn_rlpath = realpath (dirname (optarg), NULL);
 
             if (dn_rlpath == NULL) return 1;
             CONFDIR = print2string ("%s/%s", dn_rlpath, bn);
 
-            wordfree (&wp);
             free (tmp);
             free (dn_rlpath);
 
@@ -143,7 +135,20 @@ int main (int argc, char **argv) {
             }
             break;
         }
+        case 'd': {
+            char *share_rlpath = realpath (optarg, NULL);
+            if (share_rlpath == NULL) return 1;
+
+            SCRIPTDIR = print2string ("%s/scripts", share_rlpath);
+
+            if (SCRIPTDIR == NULL) {
+                PERROR ();
+                return 1;
+            }
+            break;
+        }
         case 'h':
+
             help ();
             return 0;
         case '?':
@@ -160,6 +165,7 @@ int main (int argc, char **argv) {
 
     if (init () == -1) {
         LOG (LOG_ERROR, "failed initializing");
+        PERROR ();
         return 1;
     }
 
@@ -219,6 +225,7 @@ void help (void) {
     printf ("-p, --status           show current status and configuration\n");
     printf ("-i, --ignore           ignore safety & lock checks\n");
     printf ("-c, --config           override config directory location\n");
+    printf ("-d, --sharedir         override data/share directory location\n");
     printf ("-v, --verbose          enable debug logs\n");
     printf ("-h, --help             show this message\n\n");
     printf ("It is not recommended to use sync, unsync, or resync standalone.\n");
@@ -375,11 +382,13 @@ int init (void) {
         TMPFSDIR = print2string ("%s/bor", xdgruntimedir);
     }
 
-    SCRIPTDIR = strdup (SHAREDIR "/bor/scripts");
+    if (SCRIPTDIR == NULL) {
+        SCRIPTDIR = strdup (SHAREDIR "/bor/scripts");
+    }
 
     if (CONFDIR == NULL || CONFDIR_BACKUPSDIR == NULL || TMPFSDIR == NULL
         || SCRIPTDIR == NULL) {
-        LOG (LOG_ERROR, "failed setting global vars");
+        LOG (LOG_ERROR, "failed initializing directory paths");
         return -1;
     }
 
