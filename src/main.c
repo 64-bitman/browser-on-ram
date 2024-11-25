@@ -6,6 +6,7 @@
 #include <fcntl.h>
 #include <fts.h>
 #include <getopt.h>
+#include <libgen.h>
 #include <pwd.h>
 #include <stdbool.h>
 #include <stdio.h>
@@ -15,6 +16,7 @@
 #include <sys/types.h>
 #include <time.h>
 #include <unistd.h>
+#include <wordexp.h>
 
 #ifndef SHAREDIR
     #define SHAREDIR "/usr/share"
@@ -82,6 +84,7 @@ int main (int argc, char **argv) {
                              { "resync", no_argument, NULL, 'r' },
                              { "status", no_argument, NULL, 'p' },
                              { "ignore", no_argument, NULL, 'i' },
+                             { "config", required_argument, NULL, 'c' },
                              { "verbose", no_argument, NULL, 'v' },
                              { "help", no_argument, NULL, 'h' },
                              { 0, 0, 0, 0 } };
@@ -89,7 +92,7 @@ int main (int argc, char **argv) {
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "surpivh", opts, &longindex))
+    while ((opt = getopt_long (argc, argv, "surpivhc:", opts, &longindex))
            != -1) {
         switch (opt) {
         case 's':
@@ -110,10 +113,43 @@ int main (int argc, char **argv) {
         case 'i':
             IGNORE_CHECK = true;
             break;
+        case 'c': {
+            // set config directory path
+            wordexp_t wp;
+
+            if (wordexp (optarg, &wp, WRDE_NOCMD) == -1) {
+                PERROR ();
+                return 1;
+            }
+            char *tmp = strdup(wp.we_wordv[0]);
+
+            if (tmp == NULL) return 1;
+
+            // only get realpath of dirname of exp path, incase
+            // actual path doesn't exist
+            char *bn = basename(tmp);
+            char *dn_rlpath = realpath (dirname(wp.we_wordv[0]), NULL);
+
+            if (dn_rlpath  == NULL) return 1;
+            CONFDIR = print2string("%s/%s", dn_rlpath, bn);
+
+            wordfree(&wp);
+            free(tmp);
+            free(dn_rlpath);
+
+            if (CONFDIR == NULL) {
+                PERROR ();
+                return 1;
+            }
+            break;
+        }
         case 'h':
             help ();
             return 0;
         case '?':
+            return 1;
+        default:
+            LOG (LOG_ERROR, "getopt error");
             return 1;
         }
     }
@@ -182,6 +218,7 @@ void help (void) {
     printf ("-r, --resync           resync browsers\n");
     printf ("-p, --status           show current status and configuration\n");
     printf ("-i, --ignore           ignore safety & lock checks\n");
+    printf ("-c, --config           override config directory location\n");
     printf ("-v, --verbose          enable debug logs\n");
     printf ("-h, --help             show this message\n\n");
     printf ("It is not recommended to use sync, unsync, or resync standalone.\n");
@@ -319,10 +356,13 @@ int init (void) {
     // follow XDG base spec
     char *xdgconfighome = getenv ("XDG_CONFIG_HOME");
 
-    if (xdgconfighome == NULL) {
-        CONFDIR = print2string ("%s/.config/bor", HOMEDIR);
-    } else {
-        CONFDIR = print2string ("%s/bor", xdgconfighome);
+    // only set confdir if it wasnt given by user
+    if (CONFDIR == NULL) {
+        if (xdgconfighome == NULL) {
+            CONFDIR = print2string ("%s/.config/bor", HOMEDIR);
+        } else {
+            CONFDIR = print2string ("%s/bor", xdgconfighome);
+        }
     }
     CONFDIR_BACKUPSDIR = print2string ("%s/backups", CONFDIR);
     CONFDIR_CRASHDIR = print2string ("%s/crash-reports", CONFDIR);
@@ -380,14 +420,15 @@ int init (void) {
 // read browsers.conf and return array of structs for dirs to synchronize
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
     errno = 0;
+    if (chdir (CONFDIR) == -1) return -1;
+    ;
+
     if (*browsers == NULL) {
         *browsers = calloc (MAX_BROWSERS, sizeof (**browsers));
 
         if (*browsers == NULL) return -1;
     }
     *browsers_len = 0;
-
-    chdir (CONFDIR);
 
     struct stat sb;
 
@@ -742,7 +783,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
             return -1;
         }
     } else if (dir.type == TYPE_CACHE) {
-        if (move(dir.path, dir.dirname) == -1) {
+        if (move (dir.path, dir.dirname) == -1) {
             LOG (LOG_ERROR, "failed moving directory to tmpfs");
             return -1;
         }

@@ -41,16 +41,17 @@ install: all
 	install -Dm 644 systemd/* $(PREFIX)/lib/systemd/user
 
 sync: debug
-	bin/bor -vi --sync
+	bin/bor -vi --sync --config=./test/config/bor
 
 unsync: debug
-	bin/bor -vi --unsync
+	bin/bor -vi --unsync --config=./test/config/bor
 
 resync: debug
-	bin/bor -vi --resync
+	bin/bor -vi --resync --config=./test/config/bor
 
 status: debug
-	bin/bor -vi --status
+	bin/bor -vi --status --config=./test/config/bor
+
 
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^
