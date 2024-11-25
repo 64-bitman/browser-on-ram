@@ -801,6 +801,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
     if (chdir (TMPFSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
+    // TODO: deal with bug when there is already cache dir in tmpfs?
     if (dir.type == TYPE_PROFILE) {
         if (copy_r (dir.path, dir.dirname) == -1) {
             LOG (LOG_ERROR, "failed copying directory to tmpfs");

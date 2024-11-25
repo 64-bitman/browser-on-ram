@@ -82,11 +82,11 @@ int copy_r (const char *src, const char *dest) {
 
     // add slash at end to prevent rsync placing src in dest
     if (src[strlen (src) - 1] == '/') {
-        print2string ("rsync -aX --no-whole-file --inplace '%s' '%s'", src,
-                      dest);
+        cmd = print2string ("rsync -aX --no-whole-file --inplace '%s' '%s'",
+                            src, dest);
     } else {
-        print2string ("rsync -aX --no-whole-file --inplace '%s/' '%s'", src,
-                      dest);
+        cmd = print2string ("rsync -aX --no-whole-file --inplace '%s/' '%s'",
+                            src, dest);
     }
 
     if (cmd == NULL) return -1;
@@ -95,6 +95,7 @@ int copy_r (const char *src, const char *dest) {
     free (cmd);
 
     if (status == -1 || status != 0) {
+        PERROR ();
         return -1;
     }
 
