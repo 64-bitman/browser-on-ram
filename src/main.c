@@ -85,6 +85,7 @@ int main (int argc, char **argv) {
                              { "ignore", no_argument, NULL, 'i' },
                              { "config", required_argument, NULL, 'c' },
                              { "sharedir", required_argument, NULL, 'd' },
+                             { "tmpfs", required_argument, NULL, 't' },
                              { "verbose", no_argument, NULL, 'v' },
                              { "help", no_argument, NULL, 'h' },
                              { 0, 0, 0, 0 } };
@@ -92,7 +93,7 @@ int main (int argc, char **argv) {
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "surpivhc:d:", opts, &longindex))
+    while ((opt = getopt_long (argc, argv, "surpic:d:t:vh", opts, &longindex))
            != -1) {
         switch (opt) {
         case 's':
@@ -142,6 +143,15 @@ int main (int argc, char **argv) {
             SCRIPTDIR = print2string ("%s/scripts", share_rlpath);
 
             if (SCRIPTDIR == NULL) {
+                PERROR ();
+                return 1;
+            }
+            break;
+        }
+        case 't': {
+            TMPFSDIR = realpath (optarg, NULL);
+
+            if (TMPFSDIR == NULL) {
                 PERROR ();
                 return 1;
             }
@@ -226,6 +236,7 @@ void help (void) {
     printf ("-i, --ignore           ignore safety & lock checks\n");
     printf ("-c, --config           override config directory location\n");
     printf ("-d, --sharedir         override data/share directory location\n");
+    printf ("-t, --tmpfs            override tmpfs directory location\n");
     printf ("-v, --verbose          enable debug logs\n");
     printf ("-h, --help             show this message\n\n");
     printf ("It is not recommended to use sync, unsync, or resync standalone.\n");
@@ -360,11 +371,12 @@ int init (void) {
     if (HOMEDIR == NULL) {
         return -1;
     }
-    // follow XDG base spec
-    char *xdgconfighome = getenv ("XDG_CONFIG_HOME");
 
     // only set confdir if it wasnt given by user
     if (CONFDIR == NULL) {
+        // follow XDG base spec
+        char *xdgconfighome = getenv ("XDG_CONFIG_HOME");
+
         if (xdgconfighome == NULL) {
             CONFDIR = print2string ("%s/.config/bor", HOMEDIR);
         } else {
@@ -374,12 +386,14 @@ int init (void) {
     CONFDIR_BACKUPSDIR = print2string ("%s/backups", CONFDIR);
     CONFDIR_CRASHDIR = print2string ("%s/crash-reports", CONFDIR);
 
-    char *xdgruntimedir = getenv ("XDG_RUNTIME_DIR");
+    if (TMPFSDIR == NULL) {
+        char *xdgruntimedir = getenv ("XDG_RUNTIME_DIR");
 
-    if (xdgruntimedir == NULL) {
-        TMPFSDIR = print2string ("/run/user/%d/bor", pw->pw_uid);
-    } else {
-        TMPFSDIR = print2string ("%s/bor", xdgruntimedir);
+        if (xdgruntimedir == NULL) {
+            TMPFSDIR = print2string ("/run/user/%d/bor", pw->pw_uid);
+        } else {
+            TMPFSDIR = print2string ("%s/bor", xdgruntimedir);
+        }
     }
 
     if (SCRIPTDIR == NULL) {
@@ -394,6 +408,7 @@ int init (void) {
 
     LOG (LOG_DEBUG, "home directory is %s", HOMEDIR);
     LOG (LOG_DEBUG, "conf directory is %s", CONFDIR);
+    LOG (LOG_DEBUG, "tmpfs directory is %s", TMPFSDIR);
     LOG (LOG_DEBUG, "script directory is %s", SCRIPTDIR);
 
     struct stat sb;

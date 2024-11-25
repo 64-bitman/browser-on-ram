@@ -41,16 +41,20 @@ install: all
 	install -Dm 644 systemd/* $(PREFIX)/lib/systemd/user
 
 sync: debug
-	bin/bor -vi --sync -c ./test/config/bor -d ./test/share/bor
+	bin/bor -vi --sync -c ./test/config/bor \
+		-d ./test/share/bor -t ./test/tmpfs/bor/
 
 unsync: debug
-	bin/bor -vi --unsync --config=./test/config/bor -d ./test/share/bor
+	bin/bor -vi --unsync --config=./test/config/bor \
+		-d ./test/share/bor -t ./test/tmpfs/bor/
 
 resync: debug
-	bin/bor -vi --resync --config=./test/config/bor -d ./test/share/bor
+	bin/bor -vi --resync --config=./test/config/bor \
+		-d ./test/share/bor -t ./test/tmpfs/bor/
 
 status: debug
-	bin/bor -vi --status --config=./test/config/bor -d ./test/share/bor
+	bin/bor -vi --status --config=./test/config/bor \
+		-d ./test/share/bor -t ./test/tmpfs/bor/
 
 
 $(TARGET): $(OBJ)
