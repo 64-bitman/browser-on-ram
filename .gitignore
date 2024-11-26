@@ -1,5 +1,4 @@
-bin/
-dep/
+build/
 *.vim
 vgcore.*
 .*
