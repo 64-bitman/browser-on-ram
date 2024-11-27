@@ -722,13 +722,13 @@ int sync_dir (const struct Dir dir, const char *browsername) {
     */
 
     // exclude if uid and gid dont match
-    if (stat (dir.path, &sb) == 0) {
-        if (sb.st_uid != USERID || sb.st_gid != GROUPID) {
-            LOG (LOG_ERROR,
-                 "Directory UID/GID does not match current user/group");
-            return -1;
-        }
-    }
+    /* if (stat (dir.path, &sb) == 0) { */
+    /*     if (sb.st_uid != USERID || sb.st_gid != GROUPID) { */
+    /*         LOG (LOG_ERROR, */
+    /*              "Directory UID/GID does not match current user/group"); */
+    /*         return -1; */
+    /*     } */
+    /* } */
 
     if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
