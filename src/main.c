@@ -527,6 +527,12 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
             buf = trim (buf);
 
             char *delim = strchr (buf, ' ');
+
+            if (delim == NULL) {
+                LOG (LOG_WARN, "no directory type provided");
+                continue;
+            }
+
             char *typestr = buf, *path = delim + 1;
             enum DirType type = 0;
 
