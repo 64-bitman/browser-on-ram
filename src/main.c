@@ -721,15 +721,6 @@ int sync_dir (const struct Dir dir, const char *browsername) {
        those copies
     */
 
-    // exclude if uid and gid dont match
-    /* if (stat (dir.path, &sb) == 0) { */
-    /*     if (sb.st_uid != USERID || sb.st_gid != GROUPID) { */
-    /*         LOG (LOG_ERROR, */
-    /*              "Directory UID/GID does not match current user/group"); */
-    /*         return -1; */
-    /*     } */
-    /* } */
-
     if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
@@ -788,7 +779,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         remove_r (dir.dirname);
     }
 
-    if (!LEXISTS (dir.path)) {
+    if (!DIREXISTS (dir.path)) {
         LOG (LOG_ERROR, "directory does not exist");
         return -1;
     }
@@ -807,7 +798,6 @@ int sync_dir (const struct Dir dir, const char *browsername) {
     if (chdir (TMPFSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
-    // TODO: deal with bug when there is already cache dir in tmpfs?
     if (dir.type == TYPE_PROFILE) {
         if (copy_r (dir.path, dir.dirname) == -1) {
             LOG (LOG_ERROR, "failed copying directory to tmpfs");

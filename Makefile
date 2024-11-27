@@ -51,10 +51,14 @@ $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 install: all
 	install -dm 755 $(PREFIX)/share/bor/scripts
 	install -dm 755 $(PREFIX)/lib/systemd/user
-	install -Dm 755 build/$(REL_PREFIX)/bin/bor $(PREFIX)/bin/bor
+	install -Dm 755 $(BUILD_DIR)/bin/bor $(PREFIX)/bin/bor
 	install -Dm 644 scripts/browsers/*.sh $(PREFIX)/share/bor/scripts
 	install -Dm 644 systemd/* $(PREFIX)/lib/systemd/user
 
+test: all
+	test/start-test $(BUILD_DIR)/bin/bor
+
+
 -include $(DEPS)
 
-.PHONY: all clean prebuild install rebuild
+.PHONY: all clean prebuild install rebuild test

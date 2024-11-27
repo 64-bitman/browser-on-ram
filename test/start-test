@@ -1,0 +1,97 @@
+#!/bin/sh
+
+
+bor="$(realpath $1)"
+
+cd $(dirname $(realpath $0))
+rm -rf config tmpfs share test-browser
+
+mkdir -p config/bor
+mkdir -p tmpfs/bor
+mkdir -p share/bor/scripts
+mkdir -p test-browser/{profile.one,cache.one}
+
+touch test-browser/{profile.one,cache.one}/data
+
+
+echo test-browser > config/bor/browsers.conf
+
+cat <<EOT > share/bor/scripts/test-browser.sh
+root=$\(realpath $\(dirname $\(realpath \$0\)\)/../../../test-browser\)
+
+echo profile \$root/profile.one
+echo cache \$root/cache.one
+EOT
+
+sed -i -e 's/\\//g' share/bor/scripts/test-browser.sh
+
+echo -e "SYNCING"
+
+prevtree="$(\tree -in)"
+
+$bor -v -c config/bor -d share/bor -t tmpfs/bor --sync
+
+[[ $? -ne 0 ]] && echo "sync returned bad exit"
+
+checkdirs() {
+    targetp="$(realpath test-browser/profile.one)"
+    targetc="$(realpath test-browser/cache.one)"
+
+    if [[ ! $targetp =~ "tmpfs/bor/test-browser/profile.one" || ! $targetc =~ "tmpfs/bor/test-browser/cache.one" ]]; then
+        echo "ERROR: symlinks are not valid"
+        exit 1
+    fi
+
+    if [[ ! -f "$targetp/data" || ! -f "$targetc/data" ]]; then
+        echo "ERROR: expected files are missing"
+        exit 1
+    fi
+
+    if [[ ! -w "config/bor/backups/test-browser/profile.one" ]];then
+        echo "ERROR: bad permissions on profile backup"
+        exit 1
+    fi
+
+    if [[ ! -w "tmpfs/bor/test-browser/profile.one" ]];then
+        echo "ERROR: bad permissions on profile tmpfs"
+        exit 1
+    fi
+
+    if [[ ! -w "tmpfs/bor/test-browser/cache.one" ]];then
+        echo "ERROR: bad permissions on cache tmpfs"
+        exit 1
+    fi
+}
+
+checkdirs
+
+echo -e "RESYNCING"
+
+touch tmpfs/bor/test-browser/profile.one/data2
+
+$bor -v -c config/bor -d share/bor -t tmpfs/bor --resync
+
+[[ $? -ne 0 ]] && echo "resync returned bad exit"
+
+checkdirs
+
+if [[ ! -f "config/bor/backups/test-browser/profile.one/data2" ]];then
+    echo "ERROR: files not resynced fully"
+    exit 1
+fi
+
+echo -e "UNSYNCING"
+
+$bor -v -c config/bor -d share/bor -t tmpfs/bor --unsync
+
+if [[ ! -d "test-browser/profile.one" || ! -d "test-browser/cache.one" ]]; then
+    echo "ERROR: directories are invalid"
+    exit 1
+fi
+
+if [[ -d "config/bor/backups/test-browser/profile.one" ]]; then
+    echo "ERROR: backup remaining"
+    exit 1
+fi
+
+echo "No errors detected"
