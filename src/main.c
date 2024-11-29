@@ -616,9 +616,9 @@ int do_action (int action) {
     }
 
     // check if browsers proccesses are running
-    if (!IGNORE_CHECK) {
+    if (!IGNORE_CHECK && action == 's') {
         for (size_t i = 0; i < browsers_len; i++) {
-            if (pgrep (browsers[i].name) != -1 && action != 'r') {
+            if (pgrep (browsers[i].name) != -1) {
                 LOG (LOG_ERROR, "%s is running, aborting", browsers[i].name);
                 return -1;
             }
