@@ -1,6 +1,6 @@
 [Unit]
 Description=Browser-on-ram
-Wants=bor-resync.service
+Wants=bor-resync.timer
 RequiresMountsFor=/home/
 
 [Service]

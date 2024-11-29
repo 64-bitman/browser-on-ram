@@ -8,7 +8,4 @@ BindsTo=bor.service
 Type=oneshot
 ExecStart=bor --resync --verbose
 
-[Install]
-WantedBy=default.target
-
 # vim: ft=systemd
