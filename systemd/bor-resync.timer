@@ -1,5 +1,5 @@
 [Unit]
-Description=Timer for browser-on-ram - 1Hour
+Description=Hourly timer for browser-on-ram
 BindsTo=bor.service
 
 [Timer]

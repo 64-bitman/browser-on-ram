@@ -2,7 +2,6 @@
 Description=Browser-on-ram
 Wants=bor-resync.service
 RequiresMountsFor=/home/
-After=winbindd.service
 
 [Service]
 Type=oneshot
