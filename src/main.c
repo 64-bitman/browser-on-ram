@@ -748,7 +748,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         LOG (LOG_WARN, "found tmpfs copy of directory");
 
         // if backup copy exists too, then prioritize tmpfs copy over it
-        if (EXISTS (dir.path) && !backup_exists) {
+        if (DIREXISTS (dir.path) && !backup_exists) {
             // only recover if its a profile directory
             if (dir.type == TYPE_PROFILE) {
                 if (recover (dir.dirname, browsername) == -1) {
@@ -794,7 +794,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         remove_r (dir.dirname);
     }
 
-    if (!DIREXISTS (dir.path)) {
+    if (!DIREXISTS (dir.path) ) {
         LOG (LOG_ERROR, "directory does not exist");
         return -1;
     }
