@@ -189,7 +189,7 @@ int main (int argc, char **argv) {
         }
 
         // exit if systemd service is active
-        if (systemd_userservice_active ("bor.service")) {
+        if (systemd_userservice_active ("bor.service") && action != 'r' && !IGNORE_CHECK) {
             LOG (LOG_ERROR, "Systemd user service is active, aborting");
             return 1;
         }
