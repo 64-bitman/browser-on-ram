@@ -278,7 +278,7 @@ void status (void) {
     char *srv_active, *timer_active;
 
     srv_active = systemd_userservice_active ("bor.service") ? "true" : "false";
-    timer_active = systemd_userservice_active ("bor.timer") ? "true" : "false";
+    timer_active = systemd_userservice_active ("bor-resync.timer") ? "true" : "false";
 
     char *lock_exists = EXISTS ("lock") ? "true" : "false";
 
@@ -615,6 +615,7 @@ int do_action (int action) {
         return -1;
     }
 
+    // TODO: add action to clear crash directories
     // check if browsers proccesses are running
     if (!IGNORE_CHECK && action == 's') {
         for (size_t i = 0; i < browsers_len; i++) {
