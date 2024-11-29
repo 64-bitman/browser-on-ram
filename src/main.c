@@ -73,6 +73,8 @@ int sync_dir (const struct Dir dir, const char *browsername);
 int unsync_dir (const struct Dir dir, const char *browsername);
 int resync_dir (const struct Dir dir, const char *browsername);
 
+int clear_recovery (void);
+
 int main (int argc, char **argv) {
     srand (time (NULL));
     errno = 0;
@@ -82,6 +84,7 @@ int main (int argc, char **argv) {
                              { "unsync", no_argument, NULL, 'u' },
                              { "resync", no_argument, NULL, 'r' },
                              { "status", no_argument, NULL, 'p' },
+                             { "clear", no_argument, NULL, 'x' },
                              { "ignore", no_argument, NULL, 'i' },
                              { "config", required_argument, NULL, 'c' },
                              { "sharedir", required_argument, NULL, 'd' },
@@ -93,7 +96,7 @@ int main (int argc, char **argv) {
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "surpic:d:t:vh", opts, &longindex))
+    while ((opt = getopt_long (argc, argv, "surpxic:d:t:vh", opts, &longindex))
            != -1) {
         switch (opt) {
         case 's':
@@ -110,6 +113,9 @@ int main (int argc, char **argv) {
             break;
         case 'p':
             action = 'p';
+            break;
+        case 'x':
+            action = 'x';
             break;
         case 'i':
             IGNORE_CHECK = true;
@@ -179,8 +185,6 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    int err = 0;
-
     if (action == 's' || action == 'r' || action == 'u') {
         // check if rsync is not available
         if (system ("which rsync > /dev/null 2>&1")) {
@@ -189,7 +193,8 @@ int main (int argc, char **argv) {
         }
 
         // exit if systemd service is active
-        if (systemd_userservice_active ("bor.service") && action != 'r' && !IGNORE_CHECK) {
+        if (systemd_userservice_active ("bor.service") && action != 'r'
+            && !IGNORE_CHECK) {
             LOG (LOG_ERROR, "Systemd user service is active, aborting");
             return 1;
         }
@@ -216,6 +221,7 @@ int main (int argc, char **argv) {
         } else if (action == 'u') {
             set_lock (false);
         }
+        return 0;
     }
 
     // status
@@ -223,7 +229,15 @@ int main (int argc, char **argv) {
         status ();
     }
 
-    return err;
+    // delete recovery directories
+    if (action == 'x') {
+        if (clear_recovery () == -1) {
+            LOG (LOG_ERROR, "failed clearing recovery directories");
+            return 1;
+        }
+    }
+
+    return 0;
 }
 // clang-format off
 void help (void) {
@@ -278,7 +292,8 @@ void status (void) {
     char *srv_active, *timer_active;
 
     srv_active = systemd_userservice_active ("bor.service") ? "true" : "false";
-    timer_active = systemd_userservice_active ("bor-resync.timer") ? "true" : "false";
+    timer_active
+        = systemd_userservice_active ("bor-resync.timer") ? "true" : "false";
 
     char *lock_exists = EXISTS ("lock") ? "true" : "false";
 
@@ -615,7 +630,6 @@ int do_action (int action) {
         return -1;
     }
 
-    // TODO: add action to clear crash directories
     // check if browsers proccesses are running
     if (!IGNORE_CHECK && action == 's') {
         for (size_t i = 0; i < browsers_len; i++) {
@@ -693,7 +707,7 @@ int recover (const char *path, const char *browsername) {
         goto exit;
     }
 
-    errno = 0;
+    remove_r(uniq_name);
     if (move (rlpath, uniq_name) == -1) {
         LOG (LOG_ERROR, "could not move directory to crash dir");
         free (uniq_name);
@@ -935,5 +949,65 @@ int resync_dir (const struct Dir dir, const char *browsername) {
     }
 
     free (tmpfs_path);
+    return 0;
+}
+
+int clear_recovery (void) {
+    errno = 0;
+
+    struct Browser *browsers = NULL;
+    size_t browsers_len = 0;
+
+    if (read_browsersconf (&browsers, &browsers_len) == -1) return -1;
+
+    LOG (LOG_INFO, "clearing recovery directories");
+
+    char *buf = calloc (PATH_MAX + 1, sizeof (*buf));
+
+    if (buf == NULL) return -1;
+
+    for (size_t b = 0; b < browsers_len; b++) {
+
+        struct Browser browser = browsers[b];
+
+        for (size_t d = 0; d < browser.dirs_len; d++) {
+            struct Dir dir = browser.dirs[d];
+
+            snprintf (buf, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR,
+                      browser.name);
+            DIR *dp = opendir (buf);
+
+            if (dp == NULL) return -1;
+            if (chdir (buf) == -1) return -1;
+
+            struct dirent *de = NULL;
+
+            while ((de = readdir (dp)) != NULL) {
+                if (de->d_type == DT_DIR) {
+                    char *str_start = strstr (de->d_name, "-crashreport");
+
+                    // remove -crashreport* substring
+                    if (str_start == NULL) continue;
+                    char prevc = *str_start;
+                    *str_start = 0;
+
+                    if (strcmp (de->d_name, dir.dirname) != 0) continue;
+
+                    *str_start = prevc;
+
+                    if (remove_r (de->d_name) == -1) {
+                        LOG (LOG_WARN, "failed removing %s/%s", buf,
+                             de->d_name);
+                        continue;
+                    } else {
+                        LOG (LOG_INFO, "removing %s/%s", buf, de->d_name);
+                    }
+                }
+            }
+
+            closedir (dp);
+        }
+    }
+    free (buf);
     return 0;
 }
