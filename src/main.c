@@ -305,19 +305,26 @@ void status (void) {
 
     // impletement status
     char *buf = calloc (PATH_MAX + 1, sizeof (*buf));
+    char *bcrashdir = calloc (PATH_MAX + 1, sizeof (*bcrashdir));
 
-    if (buf == NULL) return;
+    if (buf == NULL || bcrashdir == NULL) return;
 
     for (size_t b = 0; b < browsers_len; b++) {
-
         struct Browser browser = browsers[b];
 
-        printf ("%c%s:\n\n", toupper (browser.name[0]), browser.name + 1);
+        printf ("%c%s:\n", toupper (browser.name[0]), browser.name + 1);
+
+        snprintf (bcrashdir, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR,
+                  browser.name);
+
+        DIR *dp = opendir (bcrashdir);
+        struct dirent *de = NULL;
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
             off_t dir_size = get_dir_size (dir.path);
 
+            printf ("\n");
             printf ("%-20s%s\n", "Type:", DirType_str[dir.type]);
 
             if (dir_size != -1) {
@@ -341,37 +348,32 @@ void status (void) {
                 free (human);
             }
 
-            // get any crash recovery directories
-            snprintf (buf, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR,
-                      browser.name);
-            DIR *dp = opendir (buf);
+            // get any crash recovery directories if crashdir
+            // for browser exists
+            if (dp != NULL) {
+                while ((de = readdir (dp)) != NULL) {
+                    if (de->d_type == DT_DIR) {
+                        char *str_start = strstr (de->d_name, "-crashreport");
 
-            if (dp == NULL) return;
+                        // remove -crashreport* substring
+                        if (str_start == NULL) continue;
+                        char prevc = *str_start;
+                        *str_start = 0;
 
-            struct dirent *de = NULL;
+                        if (strcmp (de->d_name, dir.dirname) != 0) continue;
 
-            while ((de = readdir (dp)) != NULL) {
-                if (de->d_type == DT_DIR) {
-                    char *str_start = strstr (de->d_name, "-crashreport");
-
-                    // remove -crashreport* substring
-                    if (str_start == NULL) continue;
-                    char prevc = *str_start;
-                    *str_start = 0;
-
-                    if (strcmp (de->d_name, dir.dirname) != 0) continue;
-
-                    *str_start = prevc;
-                    printf ("%-20s%s/%s\n", "Crash directory:", buf,
-                            de->d_name);
+                        *str_start = prevc;
+                        printf ("%-20s%s/%s\n", "Crash directory:", buf,
+                                de->d_name);
+                    }
                 }
+                rewinddir (dp);
             }
-            printf ("\n");
-
-            closedir (dp);
         }
+        closedir (dp);
     }
     free (buf);
+    free (bcrashdir);
 }
 
 // init required dirs and create browsers.conf template
@@ -707,7 +709,7 @@ int recover (const char *path, const char *browsername) {
         goto exit;
     }
 
-    remove_r(uniq_name);
+    remove_r (uniq_name);
     if (move (rlpath, uniq_name) == -1) {
         LOG (LOG_ERROR, "could not move directory to crash dir");
         free (uniq_name);
@@ -794,7 +796,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         remove_r (dir.dirname);
     }
 
-    if (!DIREXISTS (dir.path) ) {
+    if (!DIREXISTS (dir.path)) {
         LOG (LOG_ERROR, "directory does not exist");
         return -1;
     }
