@@ -1,6 +1,5 @@
 #!/bin/sh
 
-
 bor="$(realpath $1)"
 
 cd $(dirname $(realpath $0))
@@ -29,7 +28,10 @@ echo -e "SYNCING"
 
 prevtree="$(\tree -in)"
 
-$bor -v -c config/bor -d share/bor -t tmpfs/bor --sync
+$bor -vi -c config/bor -d share/bor -t tmpfs/bor --sync
+$bor -vi -c config/bor -d share/bor -t tmpfs/bor --sync
+
+$bor -v --clear -c config/bor -d share/bor -t tmpfs/bor
 
 [[ $? -ne 0 ]] && echo "sync returned bad exit"
 
@@ -69,7 +71,7 @@ echo -e "RESYNCING"
 
 touch tmpfs/bor/test-browser/profile.one/data2
 
-$bor -v -c config/bor -d share/bor -t tmpfs/bor --resync
+$bor -vi -c config/bor -d share/bor -t tmpfs/bor --resync
 
 [[ $? -ne 0 ]] && echo "resync returned bad exit"
 
@@ -82,7 +84,7 @@ fi
 
 echo -e "UNSYNCING"
 
-$bor -v -c config/bor -d share/bor -t tmpfs/bor --unsync
+$bor -vi -c config/bor -d share/bor -t tmpfs/bor --unsync
 
 if [[ ! -d "test-browser/profile.one" || ! -d "test-browser/cache.one" ]]; then
     echo "ERROR: directories are invalid"
