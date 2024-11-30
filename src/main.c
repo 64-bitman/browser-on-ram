@@ -60,7 +60,7 @@ struct Browser {
 };
 
 void help (void);
-void status (void);
+int status (void);
 int set_lock (int status);
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
@@ -226,7 +226,10 @@ int main (int argc, char **argv) {
 
     // status
     if (action == 'p') {
-        status ();
+        if (status () == -1) {
+            LOG (LOG_ERROR, "status failed");
+            return 1;
+        };
     }
 
     // delete recovery directories
@@ -277,15 +280,15 @@ int set_lock (int status) {
     return 0;
 }
 
-void status (void) {
+int status (void) {
     errno = 0;
     struct stat sb;
 
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
 
-    if (read_browsersconf (&browsers, &browsers_len) == -1) return;
-    if (chdir (CONFDIR) == -1) return; // for lock
+    if (read_browsersconf (&browsers, &browsers_len) == -1) return -1;
+    if (chdir (CONFDIR) == -1) return -1; // for lock
 
     printf ("Browser-on-RAM " VERSION "\n\n");
 
@@ -307,7 +310,7 @@ void status (void) {
     char *buf = calloc (PATH_MAX + 1, sizeof (*buf));
     char *bcrashdir = calloc (PATH_MAX + 1, sizeof (*bcrashdir));
 
-    if (buf == NULL || bcrashdir == NULL) return;
+    if (buf == NULL || bcrashdir == NULL) return -1;
 
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
@@ -374,6 +377,7 @@ void status (void) {
     }
     free (buf);
     free (bcrashdir);
+    return 0;
 }
 
 // init required dirs and create browsers.conf template
