@@ -48,7 +48,7 @@ $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/$(notdir $(basename $@).d) -o $@ -c $<
 
 
-install: all
+install:
 	install -dm 755 $(PREFIX)/share/bor/scripts
 	install -dm 755 $(PREFIX)/lib/systemd/user
 	install -Dm 755 $(BUILD_DIR)/bin/bor $(PREFIX)/bin/bor
