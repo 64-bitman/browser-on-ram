@@ -577,7 +577,26 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
     return 0;
 }
 
-int lock_dir (struct Dir *dir) { return 0; }
+int setlock_dir (const struct Dir dir, int locked) {
+    errno = 0;
+    char *lockpath = print2string ("%s/.bor-lock", dir.path);
+
+    if (lockpath == NULL) return -1;
+
+    if (locked) {
+        int fd = creat (lockpath, O_RDONLY);
+
+        if (fd == -1) return -1;
+        fchmod (fd, 0444);
+        close (fd);
+    } else {
+        chmod (lockpath, 0666);
+        errno = 0;
+        if (unlink (lockpath) == -1 && errno != ENOENT) return -1;
+    }
+
+    return 0;
+}
 
 int do_action (int action) {
     errno = 0;
