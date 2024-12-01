@@ -727,7 +727,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         LOG (LOG_WARN, "found tmpfs copy of directory");
 
         // if backup copy exists too, then prioritize tmpfs copy over it
-        if (DIREXISTS (dir.path) && !backup_exists) {
+        if (LEXISTS (dir.path) && !backup_exists) {
             // only recover if its a profile directory
             if (dir.type == TYPE_PROFILE) {
                 if (recover (dir.dirname, browsername) == -1) {
@@ -735,7 +735,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
                     return -1;
                 }
             } else {
-                LOG (LOG_ERROR, "directory is cache, removing it");
+                LOG (LOG_WARN, "directory is cache, removing it");
                 remove_r (dir.dirname);
             }
         } else {
@@ -753,7 +753,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
         if (chdir (browsername) == -1) return -1;
 
-        if (DIREXISTS (dir.dirname)) {
+        if (LEXISTS (dir.dirname)) {
             LOG (LOG_WARN, "found backup copy of directory");
             if (EXISTS (dir.path)) {
                 if (recover (dir.dirname, browsername) == -1) {
