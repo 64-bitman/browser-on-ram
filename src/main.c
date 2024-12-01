@@ -736,6 +736,7 @@ int sync_dir (const struct Dir dir, const char *browsername) {
                 }
             } else {
                 LOG (LOG_ERROR, "directory is cache, removing it");
+                remove_r (dir.dirname);
             }
         } else {
             LOG (LOG_INFO, "using tmpfs copy instead of original directory");
@@ -746,8 +747,6 @@ int sync_dir (const struct Dir dir, const char *browsername) {
             if (move (dir.dirname, dir.path) == -1) return -1;
         }
     }
-    // if dir.dirname is a file or cache dir then delete it
-    remove_r (dir.dirname);
 
     // backups are only for profile dirs
     if (dir.type == TYPE_PROFILE) {
@@ -770,7 +769,6 @@ int sync_dir (const struct Dir dir, const char *browsername) {
                 if (move (dir.dirname, dir.path) == -1) return -1;
             }
         }
-        remove_r (dir.dirname);
     }
 
     if (!DIREXISTS (dir.path)) {
