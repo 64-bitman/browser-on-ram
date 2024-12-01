@@ -61,7 +61,6 @@ struct Browser {
 
 void help (void);
 int status (void);
-int set_lock (int status);
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
 int init (void);
@@ -192,35 +191,11 @@ int main (int argc, char **argv) {
             return 1;
         }
 
-        // exit if systemd service is active
-        if (systemd_userservice_active ("bor.service") && action != 'r'
-            && !IGNORE_CHECK) {
-            LOG (LOG_ERROR, "Systemd user service is active, aborting");
-            return 1;
-        }
-        if (chdir (CONFDIR) == -1) return 1;
-        int lock_exists = EXISTS ("lock");
-
-        if (!IGNORE_CHECK) {
-            if ((action == 'u' || action == 'r') && !lock_exists) {
-                LOG (LOG_ERROR, "cannot unsync/resync, lock does not exist");
-                return 1;
-            } else if (action == 's' && lock_exists) {
-                LOG (LOG_ERROR, "cannot sync, lock exists");
-                return 1;
-            }
-        }
-
         if (do_action (action) == -1) {
             LOG (LOG_ERROR, "failed attempting to sync/unsync/resync");
             return 1;
         }
 
-        if (action == 's') {
-            set_lock (true);
-        } else if (action == 'u') {
-            set_lock (false);
-        }
         return 0;
     }
 
@@ -261,25 +236,6 @@ void help (void) {
 }
 // clang-format on
 
-int set_lock (int status) {
-    errno = 0;
-    if (chdir (CONFDIR) == -1) return -1;
-
-    if (status) {
-        int fd = creat ("lock", O_RDONLY);
-
-        if (fd == -1) return -1;
-        fchmod (fd, 0444);
-        close (fd);
-    } else {
-        chmod ("lock", 0666);
-        errno = 0;
-        if (unlink ("lock") == -1 && errno != ENOENT) return -1;
-    }
-
-    return 0;
-}
-
 int status (void) {
     errno = 0;
     struct stat sb;
@@ -288,7 +244,6 @@ int status (void) {
     size_t browsers_len = 0;
 
     if (read_browsersconf (&browsers, &browsers_len) == -1) return -1;
-    if (chdir (CONFDIR) == -1) return -1; // for lock
 
     printf ("Browser-on-RAM " VERSION "\n\n");
 
@@ -298,9 +253,6 @@ int status (void) {
     timer_active
         = systemd_userservice_active ("bor-resync.timer") ? "true" : "false";
 
-    char *lock_exists = EXISTS ("lock") ? "true" : "false";
-
-    printf ("%-20s%s\n", "Active:", lock_exists);
     printf ("%-20s%s\n", "Systemd service:", srv_active);
     printf ("%-20s%s\n", "Systemd timer:", timer_active);
 
@@ -624,6 +576,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
     return 0;
 }
+
+int lock_dir (struct Dir *dir) { return 0; }
 
 int do_action (int action) {
     errno = 0;
