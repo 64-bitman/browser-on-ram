@@ -814,6 +814,9 @@ int sync_dir (const struct Dir dir, const char *browsername) {
     if (dir.type == TYPE_PROFILE) {
         if (move (dir.path, dir.dirname) == -1) {
             LOG (LOG_ERROR, "failed moving directory to backups");
+
+            remove_r (tmpfs_rlpath);
+
             free (tmpfs_rlpath);
             return -1;
         }
@@ -821,6 +824,10 @@ int sync_dir (const struct Dir dir, const char *browsername) {
 
     if (symlink (tmpfs_rlpath, dir.path) == -1) {
         LOG (LOG_ERROR, "failed creating symlink");
+
+        remove_r (tmpfs_rlpath);
+        move (dir.dirname, dir.path); // move backup back
+
         free (tmpfs_rlpath);
         return -1;
     }
