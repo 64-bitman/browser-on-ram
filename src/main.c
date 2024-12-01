@@ -65,6 +65,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
 int init (void);
 
+int setlock_dir (const struct Dir dir, int locked);
 int do_action (int action);
 int recover (const char *path, const char *browsername);
 
@@ -77,7 +78,6 @@ int clear_recovery (void);
 int main (int argc, char **argv) {
     srand (time (NULL));
     errno = 0;
-    struct stat sb;
 
     struct option opts[] = { { "sync", no_argument, NULL, 's' },
                              { "unsync", no_argument, NULL, 'u' },
@@ -637,12 +637,18 @@ int do_action (int action) {
                 if (sync_dir (dir, browser.name) == -1) {
                     LOG (LOG_WARN, "failed syncing %s", dir.path);
                     PERROR ();
+                } else {
+                    setlock_dir (dir, true);
                 }
+
             } else if (action == 'u') {
                 if (unsync_dir (dir, browser.name) == -1) {
                     LOG (LOG_WARN, "failed unsyncing %s", dir.path);
                     PERROR ();
+                } else {
+                    setlock_dir (dir, false);
                 }
+
             } else if (action == 'r') {
                 if (resync_dir (dir, browser.name) == -1) {
                     LOG (LOG_WARN, "failed resyncing %s", dir.path);
