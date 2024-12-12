@@ -585,12 +585,14 @@ int setlock_dir (const struct Dir dir, int locked) {
 
     if (locked) {
         int fd = creat (lockpath, O_RDONLY);
+        free (lockpath);
 
         if (fd == -1) return -1;
         fchmod (fd, 0444);
         close (fd);
     } else {
         chmod (lockpath, 0666);
+        free (lockpath);
         errno = 0;
         if (unlink (lockpath) == -1 && errno != ENOENT) return -1;
     }
@@ -638,7 +640,11 @@ int do_action (int action) {
                     LOG (LOG_WARN, "failed syncing %s", dir.path);
                     PERROR ();
                 } else {
-                    setlock_dir (dir, true);
+                    if (setlock_dir (dir, true) == -1) {
+                        LOG (LOG_WARN, "failed setting lock file for %s",
+                             dir.path);
+                        PERROR ();
+                    }
                 }
 
             } else if (action == 'u') {
@@ -646,7 +652,11 @@ int do_action (int action) {
                     LOG (LOG_WARN, "failed unsyncing %s", dir.path);
                     PERROR ();
                 } else {
-                    setlock_dir (dir, false);
+                    if (setlock_dir (dir, false) == -1) {
+                        LOG (LOG_WARN, "failed unsetting lock file for %s",
+                             dir.path);
+                        PERROR ();
+                    }
                 }
 
             } else if (action == 'r') {
