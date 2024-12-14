@@ -233,6 +233,7 @@ void help (void) {
     printf ("-u, --unsync           unsync browsers\n");
     printf ("-r, --resync           resync browsers\n");
     printf ("-p, --status           show current status and configuration\n");
+    printf ("-x, --clear            clear recovery directories\n");
     printf ("-i, --ignore           ignore safety & lock checks\n");
     printf ("-c, --config           override config directory location\n");
     printf ("-d, --sharedir         override data/share directory location\n");
