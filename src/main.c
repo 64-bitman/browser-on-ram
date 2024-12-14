@@ -612,10 +612,10 @@ int setlock_dir (const struct Dir dir, int locked) {
 }
 
 int lockexists_dir (const struct Dir dir) {
-    char *lockpath = print2string ("%s/.bor-lock", dir.path);
     struct stat sb;
+    char *lockpath = print2string ("%s/.bor-lock", dir.path);
 
-    if (stat (lockpath, &sb) == 0) {
+    if (LEXISTS(lockpath)) {
         free (lockpath);
         return true;
     } else {

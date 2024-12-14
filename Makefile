@@ -67,6 +67,8 @@ unsync: all
 resync: all
 	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --resync
 
+status: all
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --status
 
 -include $(DEPS)
 
