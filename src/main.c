@@ -66,6 +66,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 int init (void);
 
 int setlock_dir (const struct Dir dir, int locked);
+int lockexists_dir (const struct Dir dir);
 int do_action (int action);
 int recover (const char *path, const char *browsername);
 
@@ -592,12 +593,28 @@ int setlock_dir (const struct Dir dir, int locked) {
         close (fd);
     } else {
         chmod (lockpath, 0666);
-        free (lockpath);
         errno = 0;
-        if (unlink (lockpath) == -1 && errno != ENOENT) return -1;
+        if (unlink (lockpath) == -1 && errno != ENOENT) {
+            free (lockpath);
+            return -1;
+        }
+        free (lockpath);
     }
 
     return 0;
+}
+
+int lockexists_dir (const struct Dir dir) {
+    char *lockpath = print2string ("%s/.bor-lock", dir.path);
+    struct stat sb;
+
+    if (stat (lockpath, &sb) == 0) {
+        free (lockpath);
+        return true;
+    } else {
+        free (lockpath);
+        return false;
+    }
 }
 
 int do_action (int action) {
@@ -634,6 +651,12 @@ int do_action (int action) {
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
+
+            if (action == 's' && lockexists_dir (dir)) {
+                continue;
+            } else if (action == 'u' && !lockexists_dir (dir)) {
+                continue;
+            }
 
             if (action == 's') {
                 if (sync_dir (dir, browser.name) == -1) {
