@@ -1,8 +1,9 @@
 [Unit]
 Description=Hourly timer for browser-on-ram
 BindsTo=bor.service
+After=bor.service
 
 [Timer]
-OnUnitActiveSec=1h
+OnActiveSec=1h
 
 # vim: ft=systemd
