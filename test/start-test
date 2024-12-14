@@ -28,7 +28,6 @@ sed -i -e 's/\\//g' share/bor/scripts/test-browser.sh
 echo -e "SYNCING"
 
 $bor -v -c config/bor -d share/bor -t tmpfs/bor --sync
-$bor -v -c config/bor -d share/bor -t tmpfs/bor --sync
 
 [[ $? -ne 0 ]] && echo "sync returned bad exit"
 

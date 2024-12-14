@@ -58,7 +58,16 @@ install:
 test: all
 	test/start-test $(BUILD_DIR)/bin/bor
 
+sync: all
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --sync
+
+unsync: all
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --unsync
+
+resync: all
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --resync
+
 
 -include $(DEPS)
 
-.PHONY: all clean prebuild install rebuild test
+.PHONY: all clean prebuild install rebuild test sync unsync resync

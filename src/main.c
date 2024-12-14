@@ -130,7 +130,10 @@ int main (int argc, char **argv) {
             char *bn = basename (tmp);
             char *dn_rlpath = realpath (dirname (optarg), NULL);
 
-            if (dn_rlpath == NULL) return 1;
+            if (dn_rlpath == NULL) {
+                LOG (LOG_ERROR, "config directory does not exist");
+                return 1;
+            }
             CONFDIR = print2string ("%s/%s", dn_rlpath, bn);
 
             free (tmp);
@@ -144,7 +147,10 @@ int main (int argc, char **argv) {
         }
         case 'd': {
             char *share_rlpath = realpath (optarg, NULL);
-            if (share_rlpath == NULL) return 1;
+            if (share_rlpath == NULL) {
+                LOG (LOG_ERROR, "share directory does not exist");
+                return 1;
+            }
 
             SCRIPTDIR = print2string ("%s/scripts", share_rlpath);
 
@@ -159,6 +165,7 @@ int main (int argc, char **argv) {
 
             if (TMPFSDIR == NULL) {
                 PERROR ();
+                LOG (LOG_ERROR, "tmpfs directory does not exist");
                 return 1;
             }
             break;
