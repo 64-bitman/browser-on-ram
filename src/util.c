@@ -82,10 +82,12 @@ int copy_r (const char *src, const char *dest) {
 
     // add slash at end to prevent rsync placing src in dest
     if (src[strlen (src) - 1] == '/') {
-        cmd = print2string ("rsync -aX --no-whole-file --inplace '%s' '%s'",
+        cmd = print2string ("rsync -aX --exclude .bor-lock --no-whole-file "
+                            "--inplace '%s' '%s'",
                             src, dest);
     } else {
-        cmd = print2string ("rsync -aX --no-whole-file --inplace '%s/' '%s'",
+        cmd = print2string ("rsync -aX --exclude .bor-lock --no-whole-file "
+                            "--inplace '%s/' '%s'",
                             src, dest);
     }
 
