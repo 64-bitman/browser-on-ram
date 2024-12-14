@@ -648,6 +648,7 @@ int do_action (int action) {
         if (mkdir_p (browser.name, 0755) == -1) continue;
 
         LOG (LOG_INFO, "syncing %s", browser.name);
+        int count = 0;
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
@@ -688,6 +689,10 @@ int do_action (int action) {
                     PERROR ();
                 }
             }
+            count++;
+        }
+        if (count == 0) {
+            LOG (LOG_INFO, "no action done for any directory");
         }
     }
     return 0;
