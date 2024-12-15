@@ -616,7 +616,7 @@ int lockexists_dir (const struct Dir dir) {
     struct stat sb;
     char *lockpath = print2string ("%s/.bor-lock", dir.path);
 
-    if (LEXISTS(lockpath)) {
+    if (LEXISTS (lockpath)) {
         free (lockpath);
         return true;
     } else {
@@ -655,7 +655,13 @@ int do_action (int action) {
         if (chdir (TMPFSDIR) == -1) continue;
         if (mkdir_p (browser.name, 0755) == -1) continue;
 
-        LOG (LOG_INFO, "syncing %s", browser.name);
+        if (action == 's') {
+            LOG (LOG_INFO, "syncing %s", browser.name);
+        } else if (action == 'u') {
+            LOG (LOG_INFO, "unsyncing %s", browser.name);
+        } else if (action == 'r') {
+            LOG (LOG_INFO, "resyncing %s", browser.name);
+        }
         int count = 0;
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
