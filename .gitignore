@@ -6,4 +6,5 @@ vgcore.*
 .*
 !.gitignore
 !.clang-format
+!.pre-commit-config.yaml
 compile_commands.json

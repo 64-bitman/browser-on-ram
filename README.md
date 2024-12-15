@@ -14,5 +14,5 @@ make install # doesn't exist, I will create that soon
 # Browsers Supported
 * Firefox
 
-# License 
+# License
 [MIT](https://github.com/64-bitman/browser-on-ram/blob/main/LICENSE)
