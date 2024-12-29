@@ -512,6 +512,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         while (getline (&buf, &buf_size, pp) != -1) {
             buf = trim (buf);
 
+            // set space between <dirtype> and <path> to NULL so we only see dirtype part
             char *delim = strchr (buf, ' ');
 
             if (delim == NULL) {
@@ -524,6 +525,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
             *delim = 0;
 
+            // compare dir type to database of dir types
             for (int i = 1; i < TYPES_LEN; i++) {
                 if (strcmp (typestr, DirType_str[i]) == 0) {
                     type = i;
@@ -531,6 +533,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
                 }
             }
 
+            // note: if path has a space in it and there is no dir type
+            // then this will handle it
             if (type == 0) {
                 LOG (LOG_WARN, "Unknown directory type '%'", typestr);
                 continue;
@@ -540,6 +544,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
             if (exclude_fp != NULL) {
                 int exclude = false;
 
+                // read through exclude.conf
                 while (getline (&ebuf, &ebuf_size, exclude_fp) != -1) {
                     ebuf = trim (ebuf);
                     if (strcmp (path, ebuf) == 0) {
@@ -590,6 +595,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
     return 0;
 }
 
+// create or unset lock in dir.path
 int setlock_dir (const struct Dir dir, int locked) {
     errno = 0;
     char *lockpath = print2string ("%s/.bor-lock", dir.path);
@@ -616,6 +622,7 @@ int setlock_dir (const struct Dir dir, int locked) {
     return 0;
 }
 
+// return true or false if lock in dir.path exists
 int lockexists_dir (const struct Dir dir) {
     struct stat sb;
     char *lockpath = print2string ("%s/.bor-lock", dir.path);
@@ -671,6 +678,7 @@ int do_action (int action) {
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
 
+            // sync only if lock doesn't exists and unsync/resync only if lock exists
             if (action == 's' && lockexists_dir (dir)) {
                 continue;
             } else if ((action == 'u' || action == 'r') && !lockexists_dir (dir)) {
@@ -678,6 +686,7 @@ int do_action (int action) {
             }
 
             if (action == 's') {
+                // if sync was successful, then set lock
                 if (sync_dir (dir, browser.name) == -1) {
                     LOG (LOG_WARN, "failed syncing %s", dir.path);
                     PERROR ();
@@ -747,6 +756,8 @@ int recover (const char *path, const char *browsername) {
         err = -1;
         goto exit;
     }
+
+    // remove existing directory if it exists
 
     remove_r (uniq_name);
     if (move (rlpath, uniq_name) == -1) {
@@ -1019,6 +1030,7 @@ int clear_recovery (void) {
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
 
+            // read crash directory folder for browser
             snprintf (buf, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR,
                       browser.name);
             DIR *dp = opendir (buf);
@@ -1038,6 +1050,8 @@ int clear_recovery (void) {
                     char prevc = *str_start;
                     *str_start = 0;
 
+                    // skip if dirname without -crashreport doesn't match original directory
+                    // (we don't want to accidently non crash directories)
                     if (strcmp (de->d_name, dir.dirname) != 0) continue;
 
                     *str_start = prevc;
