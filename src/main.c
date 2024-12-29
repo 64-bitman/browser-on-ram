@@ -41,8 +41,8 @@ static char *CONFDIR_CRASHDIR = NULL;
 static char *TMPFSDIR = NULL;
 static char *SCRIPTDIR = NULL;
 static int IGNORE_CHECK = false;
+static int SETUID = false;
 static uid_t USERID = 0;
-static gid_t GROUPID = 0;
 
 enum DirType { TYPE_PROFILE = 1, TYPE_CACHE, TYPES_LEN };
 
@@ -80,8 +80,26 @@ int clear_recovery (void);
 int main (int argc, char **argv) {
     errno = 0;
 
-    // drop permissions immediately in case setuid is set
+    // too lazy to handle setgid (no use anyways);
+    if (getegid () != getgid ()) {
+        printf ("program has setgid bit, aborting\n");
+        return 1;
+    }
+
+    // drop permissions immediately if setuid bit is set
     // we only escalate when mounting overlayfs
+    if (geteuid () == 0) {
+        SETUID = true;
+        // save user id to switch back after escalation
+        USERID = getuid ();
+
+        seteuid (USERID);
+    } else if (geteuid ()
+               != getuid ()) { // abort if setuid is set but not root
+        printf (
+            "program is not owned by root but has a setuid bit, aborting\n");
+        return 1;
+    }
 
     struct option opts[] = { { "sync", no_argument, NULL, 's' },
                              { "unsync", no_argument, NULL, 'u' },
@@ -192,6 +210,12 @@ int main (int argc, char **argv) {
     if (argc > optind || optind == 1) {
         help ();
         return 0;
+    }
+    if (SETUID == true) {
+        LOG (LOG_DEBUG,
+             "running as setuid program, real userid: %d | effective userid: "
+             "%d",
+             getuid (), geteuid ());
     }
 
     if (init () == -1) {
@@ -355,8 +379,6 @@ int init (void) {
     struct passwd *pw = getpwuid (getuid ());
 
     HOMEDIR = strdup (pw->pw_dir);
-    USERID = pw->pw_uid;
-    GROUPID = pw->pw_gid;
 
     if (HOMEDIR == NULL) {
         return -1;
