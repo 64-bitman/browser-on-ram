@@ -90,13 +90,14 @@ int main (int argc, char **argv) {
                              { "sharedir", required_argument, NULL, 'd' },
                              { "tmpfs", required_argument, NULL, 't' },
                              { "verbose", no_argument, NULL, 'v' },
+                             { "version", no_argument, NULL, 'V' },
                              { "help", no_argument, NULL, 'h' },
                              { 0, 0, 0, 0 } };
     int opt;
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "surpxic:d:t:vh", opts, &longindex))
+    while ((opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts, &longindex))
            != -1) {
         switch (opt) {
         case 's':
@@ -111,6 +112,9 @@ int main (int argc, char **argv) {
         case 'v':
             LOG_LEVEL = LOG_DEBUG;
             break;
+        case 'V':
+            printf("BROWSER-ON-RAM "VERSION"\n");
+            return 0;
         case 'p':
             action = 'p';
             break;
@@ -669,7 +673,7 @@ int do_action (int action) {
 
             if (action == 's' && lockexists_dir (dir)) {
                 continue;
-            } else if (action == 'u' && !lockexists_dir (dir)) {
+            } else if ((action == 'u' || action == 'r') && !lockexists_dir (dir)) {
                 continue;
             }
 
@@ -1026,6 +1030,7 @@ int clear_recovery (void) {
 
             while ((de = readdir (dp)) != NULL) {
                 if (de->d_type == DT_DIR) {
+                    // cut off -crashreport part and compare to original directory
                     char *str_start = strstr (de->d_name, "-crashreport");
 
                     // remove -crashreport* substring
