@@ -93,9 +93,13 @@ int main (int argc, char **argv) {
         // save user id to switch back after escalation
         USERID = getuid ();
 
-        seteuid (USERID);
-    } else if (geteuid ()
-               != getuid ()) { // abort if setuid is set but not root
+        if (seteuid (USERID) == -1) {
+            printf ("seteuid failed\n");
+            PERROR ();
+            return 1;
+        };
+    } else if (geteuid () != getuid ()) {
+        // abort if setuid is set but not root
         printf (
             "program is not owned by root but has a setuid bit, aborting\n");
         return 1;

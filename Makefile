@@ -54,23 +54,24 @@ install:
 	install -Dm 755 $(BUILD_DIR)/bin/bor $(PREFIX)/bin/bor
 	install -Dm 644 scripts/browsers/*.sh $(PREFIX)/share/bor/scripts
 	install -Dm 644 systemd/* $(PREFIX)/lib/systemd/user
-	@echo 'applying setuid bit (press ctrl-c if you dont want it)'
+
+install_setuid:
 	chown root:root $(PREFIX)/bin/bor
 	chmod u+s $(PREFIX)/bin/bor
 
 test: all
 	test/start-test $(BUILD_DIR)/bin/bor
 
-sync: all setuid
+sync: all
 	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --sync
 
-unsync: all setuid
+unsync: all
 	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --unsync
 
-resync: all setuid
+resync: all
 	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --resync
 
-status: all setuid
+status: all
 	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --status
 
 setuid:
