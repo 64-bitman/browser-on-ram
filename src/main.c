@@ -60,6 +60,21 @@ struct Browser {
     size_t dirs_len;
 };
 
+static const struct option opts[]
+    = { { "sync", no_argument, NULL, 's' },
+        { "unsync", no_argument, NULL, 'u' },
+        { "resync", no_argument, NULL, 'r' },
+        { "status", no_argument, NULL, 'p' },
+        { "clear", no_argument, NULL, 'x' },
+        { "ignore", no_argument, NULL, 'i' },
+        { "config", required_argument, NULL, 'c' },
+        { "sharedir", required_argument, NULL, 'd' },
+        { "tmpfs", required_argument, NULL, 't' },
+        { "verbose", no_argument, NULL, 'v' },
+        { "version", no_argument, NULL, 'V' },
+        { "help", no_argument, NULL, 'h' },
+        { 0, 0, 0, 0 } };
+
 void help (void);
 int status (void);
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
@@ -76,6 +91,7 @@ int unsync_dir (const struct Dir dir, const char *browsername);
 int resync_dir (const struct Dir dir, const char *browsername);
 
 int clear_recovery (void);
+int mount_overlayfs (const char *upper, const char *lower);
 
 int main (int argc, char **argv) {
     errno = 0;
@@ -105,19 +121,6 @@ int main (int argc, char **argv) {
         return 1;
     }
 
-    struct option opts[] = { { "sync", no_argument, NULL, 's' },
-                             { "unsync", no_argument, NULL, 'u' },
-                             { "resync", no_argument, NULL, 'r' },
-                             { "status", no_argument, NULL, 'p' },
-                             { "clear", no_argument, NULL, 'x' },
-                             { "ignore", no_argument, NULL, 'i' },
-                             { "config", required_argument, NULL, 'c' },
-                             { "sharedir", required_argument, NULL, 'd' },
-                             { "tmpfs", required_argument, NULL, 't' },
-                             { "verbose", no_argument, NULL, 'v' },
-                             { "version", no_argument, NULL, 'V' },
-                             { "help", no_argument, NULL, 'h' },
-                             { 0, 0, 0, 0 } };
     int opt;
     int longindex;
     char action = 0;
@@ -275,6 +278,7 @@ void help (void) {
     printf ("-d, --sharedir         override data/share directory location\n");
     printf ("-t, --tmpfs            override tmpfs directory location\n");
     printf ("-v, --verbose          enable debug logs\n");
+    printf ("-V, --version          show program version\n");
     printf ("-h, --help             show this message\n\n");
     printf ("It is not recommended to use sync, unsync, or resync standalone.\n");
     printf ("Please use the systemd user service instead\n");
@@ -1107,5 +1111,13 @@ int clear_recovery (void) {
         }
     }
     free (buf);
+    return 0;
+}
+
+int mount_overlayfs (const char *upper, const char *lower) {
+    (void)upper;
+    (void)lower;
+    errno = 0;
+
     return 0;
 }
