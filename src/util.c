@@ -41,6 +41,7 @@ void log_print (enum LogLevel level, const char *file, const int line,
     va_end (args);
 }
 
+// allocate string on heap and printf to it
 char *print2string (const char *format, ...) {
     va_list args;
     char *str;
@@ -54,6 +55,7 @@ char *print2string (const char *format, ...) {
     return str;
 }
 
+// delete leading and trailing whitespace
 char *trim (char *str) {
     char *s = str;
 
@@ -150,6 +152,7 @@ int remove_r (const char *path) {
     return 0;
 }
 
+// add date and time to end of filename
 char *filename_wtime (const char *filename, const char *str) {
     const time_t t = time (NULL);
     struct tm *tm = localtime (&t);
@@ -305,6 +308,8 @@ int mkdir_p (const char *path, mode_t mode) {
     return 0;
 }
 
+// move directory, either by moving it or copying it if on different
+// filesystems
 int move (const char *oldpath, const char *newpath) {
     errno = 0;
     struct stat sb;
