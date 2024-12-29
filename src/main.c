@@ -12,6 +12,7 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <time.h>
@@ -77,8 +78,10 @@ int resync_dir (const struct Dir dir, const char *browsername);
 int clear_recovery (void);
 
 int main (int argc, char **argv) {
-    srand (time (NULL));
     errno = 0;
+
+    // drop permissions immediately in case setuid is set
+    // we only escalate when mounting overlayfs
 
     struct option opts[] = { { "sync", no_argument, NULL, 's' },
                              { "unsync", no_argument, NULL, 'u' },
@@ -97,8 +100,9 @@ int main (int argc, char **argv) {
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts, &longindex))
-           != -1) {
+    while (
+        (opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts, &longindex))
+        != -1) {
         switch (opt) {
         case 's':
             action = 's';
@@ -113,7 +117,7 @@ int main (int argc, char **argv) {
             LOG_LEVEL = LOG_DEBUG;
             break;
         case 'V':
-            printf("BROWSER-ON-RAM "VERSION"\n");
+            printf ("BROWSER-ON-RAM " VERSION "\n");
             return 0;
         case 'p':
             action = 'p';
@@ -361,7 +365,7 @@ int init (void) {
     // only set confdir if it wasnt given by user
     if (CONFDIR == NULL) {
         // follow XDG base spec
-        char *xdgconfighome = getenv ("XDG_CONFIG_HOME");
+        char *xdgconfighome = secure_getenv ("XDG_CONFIG_HOME");
 
         if (xdgconfighome == NULL) {
             CONFDIR = print2string ("%s/.config/bor", HOMEDIR);
@@ -373,7 +377,7 @@ int init (void) {
     CONFDIR_CRASHDIR = print2string ("%s/crash-reports", CONFDIR);
 
     if (TMPFSDIR == NULL) {
-        char *xdgruntimedir = getenv ("XDG_RUNTIME_DIR");
+        char *xdgruntimedir = secure_getenv ("XDG_RUNTIME_DIR");
 
         if (xdgruntimedir == NULL) {
             TMPFSDIR = print2string ("/run/user/%d/bor", pw->pw_uid);
@@ -382,6 +386,8 @@ int init (void) {
         }
     }
 
+    // check if user has set sharedir (therefor scriptdir), else use the macro
+    // value
     if (SCRIPTDIR == NULL) {
         SCRIPTDIR = strdup (SHAREDIR "/bor/scripts");
     }
@@ -512,7 +518,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         while (getline (&buf, &buf_size, pp) != -1) {
             buf = trim (buf);
 
-            // set space between <dirtype> and <path> to NULL so we only see dirtype part
+            // set space between <dirtype> and <path> to NULL so we only see
+            // dirtype part
             char *delim = strchr (buf, ' ');
 
             if (delim == NULL) {
@@ -678,10 +685,12 @@ int do_action (int action) {
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
 
-            // sync only if lock doesn't exists and unsync/resync only if lock exists
+            // sync only if lock doesn't exists and unsync/resync only if lock
+            // exists
             if (action == 's' && lockexists_dir (dir)) {
                 continue;
-            } else if ((action == 'u' || action == 'r') && !lockexists_dir (dir)) {
+            } else if ((action == 'u' || action == 'r')
+                       && !lockexists_dir (dir)) {
                 continue;
             }
 
@@ -1042,7 +1051,8 @@ int clear_recovery (void) {
 
             while ((de = readdir (dp)) != NULL) {
                 if (de->d_type == DT_DIR) {
-                    // cut off -crashreport part and compare to original directory
+                    // cut off -crashreport part and compare to original
+                    // directory
                     char *str_start = strstr (de->d_name, "-crashreport");
 
                     // remove -crashreport* substring
@@ -1050,8 +1060,9 @@ int clear_recovery (void) {
                     char prevc = *str_start;
                     *str_start = 0;
 
-                    // skip if dirname without -crashreport doesn't match original directory
-                    // (we don't want to accidently non crash directories)
+                    // skip if dirname without -crashreport doesn't match
+                    // original directory (we don't want to accidently non
+                    // crash directories)
                     if (strcmp (de->d_name, dir.dirname) != 0) continue;
 
                     *str_start = prevc;
