@@ -345,7 +345,7 @@ int status (void) {
     return 0;
 }
 
-// init required dirs and create browsers.conf template
+// initialize required dirs and create browsers.conf template
 int init (void) {
     errno = 0;
     struct passwd *pw = getpwuid (getuid ());
