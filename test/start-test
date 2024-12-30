@@ -23,6 +23,10 @@ echo profile \$root/profile.two
 echo cache \$root/cache.two
 EOT
 
+cat <<EOT > config/bor/bor.conf
+enable_overlay = false
+EOT
+
 sed -i -e 's/\\//g' share/bor/scripts/test-browser.sh
 
 echo -e "SYNCING"

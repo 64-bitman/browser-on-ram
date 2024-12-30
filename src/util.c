@@ -329,3 +329,13 @@ int move (const char *oldpath, const char *newpath) {
     if (remove_r (oldpath) == -1) return -1;
     return 0;
 }
+
+// return true if string is true/1 or false if string is false/0, else -1
+int get_bool (const char *value) {
+    if (strcmp (value, "true") == 0 || strcmp (value, "1") == 0) {
+        return true;
+    } else if (strcmp (value, "false") == 0 || strcmp (value, "0") == 0) {
+        return false;
+    }
+    return -1;
+}

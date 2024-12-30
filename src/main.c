@@ -60,6 +60,10 @@ struct Browser {
     size_t dirs_len;
 };
 
+struct Config {
+    int enable_overlay;
+} CONFIG = { 0 };
+
 static const struct option opts[]
     = { { "sync", no_argument, NULL, 's' },
         { "unsync", no_argument, NULL, 'u' },
@@ -80,6 +84,7 @@ int status (void);
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
 int init (void);
+int init_config (void);
 
 int setlock_dir (const struct Dir dir, int locked);
 int lockexists_dir (const struct Dir dir);
@@ -227,6 +232,12 @@ int main (int argc, char **argv) {
 
     if (init () == -1) {
         LOG (LOG_ERROR, "failed initializing");
+        PERROR ();
+        return 1;
+    }
+
+    if (init_config () == -1) {
+        LOG (LOG_ERROR, "failed reading config");
         PERROR ();
         return 1;
     }
@@ -451,14 +462,80 @@ int init (void) {
     if (chdir (CONFDIR) == -1) return -1;
 
     if (!EXISTS ("browsers.conf")) {
-        int fd = creat ("browsers.conf", 0644);
+        FILE *bcfp = fopen ("browsers.conf", "w");
 
-        dprintf (fd, "# each line corrosponds to a browser that should be "
-                     "synced, ex:\n");
-        dprintf (fd, "# firefox\n# chromium\n");
+        if (bcfp == NULL) {
+            LOG (LOG_ERROR, "failed creating browser.conf");
+            return -1;
+        }
 
-        close (fd);
+        fprintf (bcfp, "# each line corrosponds to a browser that should be "
+                       "synced, ex:\n");
+        fprintf (bcfp, "# firefox\n# chromium\n");
+
+        fclose (bcfp);
     }
+
+    return 0;
+}
+
+// read & initialize config file & config structure
+int init_config (void) {
+    errno = 0;
+    struct stat sb;
+
+    // defaults
+    CONFIG.enable_overlay = false;
+
+    if (chdir (CONFDIR) == -1) return -1;
+    // don't read if config file doesnt exist
+    if (!EXISTS ("bor.conf")) return 0;
+
+    FILE *conf_fp = fopen ("bor.conf", "r");
+
+    if (conf_fp == NULL) {
+        LOG (LOG_ERROR, "failed opening bor.conf");
+        return -1;
+    }
+
+    char *buf = NULL;
+    size_t buf_size;
+
+    // config file format: <key>=<value>
+    while (getline (&buf, &buf_size, conf_fp) != -1) {
+        buf = trim (buf);
+
+        char *equal_sign = strchr (buf, '=');
+
+        if (equal_sign == NULL) {
+            LOG (LOG_WARN, "invalid config option %s", buf);
+            continue;
+        }
+
+        char *key = buf, *value = equal_sign + 1;
+
+        *equal_sign = 0; // split key and value
+        key = trim (key);
+        value = trim (value);
+
+        // read config
+        if (strcmp (key, "enable_overlay") == 0) {
+            int boolean = get_bool (value);
+
+            if (boolean == -1) {
+                LOG (LOG_WARN, "invalid value for config option %s = %s",
+                     value, key);
+                continue;
+            }
+            CONFIG.enable_overlay = boolean;
+        } else {
+            LOG (LOG_WARN, "unknown config option %s = %s", key, value);
+        }
+        LOG (LOG_DEBUG, "received config option %s = %s", key, value);
+    }
+
+    free (buf);
+    fclose (conf_fp);
 
     return 0;
 }
