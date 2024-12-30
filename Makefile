@@ -63,16 +63,16 @@ test: all
 	test/start-test $(BUILD_DIR)/bin/bor
 
 sync: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --sync
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs--sync
 
 unsync: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --unsync
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --unsync
 
 resync: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --resync
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --resync
 
 status: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --status
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --status
 
 setuid:
 	sudo chown root:root $(TARGET)

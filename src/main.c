@@ -35,6 +35,7 @@
 #endif
 
 static char *HOMEDIR = NULL;
+static char *RUNTIMEDIR = NULL;
 static char *CONFDIR = NULL;
 static char *CONFDIR_BACKUPSDIR = NULL;
 static char *CONFDIR_CRASHDIR = NULL;
@@ -73,7 +74,7 @@ static const struct option opts[]
         { "ignore", no_argument, NULL, 'i' },
         { "config", required_argument, NULL, 'c' },
         { "sharedir", required_argument, NULL, 'd' },
-        { "tmpfs", required_argument, NULL, 't' },
+        { "runtimedir", required_argument, NULL, 't' },
         { "verbose", no_argument, NULL, 'v' },
         { "version", no_argument, NULL, 'V' },
         { "help", no_argument, NULL, 'h' },
@@ -107,12 +108,13 @@ int main (int argc, char **argv) {
         return 1;
     }
 
+    // save user id to switch back after escalation
+    USERID = getuid ();
+
     // drop permissions immediately if setuid bit is set
-    // we only escalate when mounting overlayfs
+    // we only escalate when mounting overlay
     if (geteuid () == 0) {
         SETUID = true;
-        // save user id to switch back after escalation
-        USERID = getuid ();
 
         if (seteuid (USERID) == -1) {
             printf ("seteuid failed\n");
@@ -120,7 +122,7 @@ int main (int argc, char **argv) {
             return 1;
         };
     } else if (geteuid () != getuid ()) {
-        // abort if setuid is set but not root
+        // abort if setuid is set but it is not root
         printf (
             "program is not owned by root but has a setuid bit, aborting\n");
         return 1;
@@ -199,11 +201,11 @@ int main (int argc, char **argv) {
             break;
         }
         case 't': {
-            TMPFSDIR = realpath (optarg, NULL);
+            RUNTIMEDIR = realpath (optarg, NULL);
 
-            if (TMPFSDIR == NULL) {
+            if (RUNTIMEDIR == NULL) {
                 PERROR ();
-                LOG (LOG_ERROR, "tmpfs directory does not exist");
+                LOG (LOG_ERROR, "runtime directory does not exist");
                 return 1;
             }
             break;
@@ -287,7 +289,7 @@ void help (void) {
     printf ("-i, --ignore           ignore safety & lock checks\n");
     printf ("-c, --config           override config directory location\n");
     printf ("-d, --sharedir         override data/share directory location\n");
-    printf ("-t, --tmpfs            override tmpfs directory location\n");
+    printf ("-t, --runtimedir       override runtime directory location\n");
     printf ("-v, --verbose          enable debug logs\n");
     printf ("-V, --version          show program version\n");
     printf ("-h, --help             show this message\n\n");
@@ -395,13 +397,11 @@ int status (void) {
 // initialize required dirs and create browsers.conf template
 int init (void) {
     errno = 0;
-    struct passwd *pw = getpwuid (getuid ());
+    struct passwd *pw = getpwuid (USERID);
 
     HOMEDIR = strdup (pw->pw_dir);
 
-    if (HOMEDIR == NULL) {
-        return -1;
-    }
+    if (HOMEDIR == NULL) return -1;
 
     // only set confdir if it wasnt given by user
     if (CONFDIR == NULL) {
@@ -417,15 +417,21 @@ int init (void) {
     CONFDIR_BACKUPSDIR = print2string ("%s/backups", CONFDIR);
     CONFDIR_CRASHDIR = print2string ("%s/crash-reports", CONFDIR);
 
-    if (TMPFSDIR == NULL) {
-        char *xdgruntimedir = secure_getenv ("XDG_RUNTIME_DIR");
+    char *xdgruntimedir = secure_getenv ("XDG_RUNTIME_DIR");
 
+    if (RUNTIMEDIR == NULL) {
         if (xdgruntimedir == NULL) {
-            TMPFSDIR = print2string ("/run/user/%d/bor", pw->pw_uid);
+            RUNTIMEDIR = print2string ("/run/user/%d", USERID);
+            TMPFSDIR = print2string ("%s/bor", RUNTIMEDIR, USERID);
         } else {
+            RUNTIMEDIR = strdup (xdgruntimedir);
             TMPFSDIR = print2string ("%s/bor", xdgruntimedir);
         }
+    } else {
+        TMPFSDIR = print2string ("%s/bor", RUNTIMEDIR, USERID);
     }
+
+    if (RUNTIMEDIR == NULL) return -1;
 
     // check if user has set sharedir (therefor scriptdir), else use the macro
     // value
@@ -440,6 +446,7 @@ int init (void) {
     }
 
     LOG (LOG_DEBUG, "home directory is %s", HOMEDIR);
+    LOG (LOG_DEBUG, "runtime directory is %s", RUNTIMEDIR);
     LOG (LOG_DEBUG, "conf directory is %s", CONFDIR);
     LOG (LOG_DEBUG, "tmpfs directory is %s", TMPFSDIR);
     LOG (LOG_DEBUG, "script directory is %s", SCRIPTDIR);
