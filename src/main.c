@@ -48,7 +48,7 @@ static uid_t USERID = 0;
 
 enum DirType { TYPE_PROFILE = 1, TYPE_CACHE, TYPES_LEN };
 
-static const char *DirType_str[] = { NULL, "profile", "cache" };
+static const char *DirType_str[] = {NULL, "profile", "cache"};
 
 struct Dir {
     char *dirname;
@@ -64,22 +64,22 @@ struct Browser {
 
 struct Config {
     int enable_overlay;
-} CONFIG = { 0 };
+} CONFIG = {0};
 
-static const struct option opts[]
-    = { { "sync", no_argument, NULL, 's' },
-        { "unsync", no_argument, NULL, 'u' },
-        { "resync", no_argument, NULL, 'r' },
-        { "status", no_argument, NULL, 'p' },
-        { "clear", no_argument, NULL, 'x' },
-        { "ignore", no_argument, NULL, 'i' },
-        { "config", required_argument, NULL, 'c' },
-        { "sharedir", required_argument, NULL, 'd' },
-        { "runtimedir", required_argument, NULL, 't' },
-        { "verbose", no_argument, NULL, 'v' },
-        { "version", no_argument, NULL, 'V' },
-        { "help", no_argument, NULL, 'h' },
-        { 0, 0, 0, 0 } };
+static const struct option opts[] = {
+    {"sync", no_argument, NULL, 's'},
+    {"unsync", no_argument, NULL, 'u'},
+    {"resync", no_argument, NULL, 'r'},
+    {"status", no_argument, NULL, 'p'},
+    {"clear", no_argument, NULL, 'x'},
+    {"ignore", no_argument, NULL, 'i'},
+    {"config", required_argument, NULL, 'c'},
+    {"sharedir", required_argument, NULL, 'd'},
+    {"runtimedir", required_argument, NULL, 't'},
+    {"verbose", no_argument, NULL, 'v'},
+    {"version", no_argument, NULL, 'V'},
+    {"help", no_argument, NULL, 'h'},
+    {0, 0, 0, 0}};
 
 void help (void);
 int status (void);
@@ -135,9 +135,8 @@ int main (int argc, char **argv) {
     int longindex;
     char action = 0;
 
-    while (
-        (opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts, &longindex))
-        != -1) {
+    while ((opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts,
+                               &longindex)) != -1) {
         switch (opt) {
         case 's':
             action = 's';
@@ -281,7 +280,7 @@ int main (int argc, char **argv) {
     return 0;
 }
 // clang-format off
-void help (void) {
+void help(void) {
     printf ("BROWSER-ON-RAM "VERSION"\n\n");
     printf ("Usage: bor [OPTION]\n");
     printf ("-s, --sync             sync browsers to memory\n");
@@ -315,8 +314,8 @@ int status (void) {
     char *srv_active, *timer_active;
 
     srv_active = systemd_userservice_active ("bor.service") ? "true" : "false";
-    timer_active
-        = systemd_userservice_active ("bor-resync.timer") ? "true" : "false";
+    timer_active =
+        systemd_userservice_active ("bor-resync.timer") ? "true" : "false";
 
     printf ("%-20s%s\n", "Systemd service:", srv_active);
     printf ("%-20s%s\n", "Systemd timer:", timer_active);
@@ -442,8 +441,8 @@ int init (void) {
         SCRIPTDIR = strdup (SHAREDIR "/bor/scripts");
     }
 
-    if (CONFDIR == NULL || CONFDIR_BACKUPSDIR == NULL || TMPFSDIR == NULL
-        || SCRIPTDIR == NULL) {
+    if (CONFDIR == NULL || CONFDIR_BACKUPSDIR == NULL || TMPFSDIR == NULL ||
+        SCRIPTDIR == NULL) {
         LOG (LOG_ERROR, "failed initializing directory paths");
         return -1;
     }
@@ -533,8 +532,8 @@ int init_config (void) {
             int boolean = get_bool (value);
 
             if (boolean == -1) {
-                LOG (LOG_WARN, "invalid value for config option %s = %s",
-                     value, key);
+                LOG (LOG_WARN, "invalid value for config option %s = %s", value,
+                     key);
                 continue;
             }
             CONFIG.enable_overlay = boolean;
@@ -621,10 +620,10 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
         if (pp == NULL) return -1;
 
-        struct Browser browser
-            = { .name = strdup (browsername),
-                .dirs = calloc (MAX_DIRS, sizeof (*(browser.dirs))),
-                .dirs_len = 0 };
+        struct Browser browser = {
+            .name = strdup (browsername),
+            .dirs = calloc (MAX_DIRS, sizeof (*(browser.dirs))),
+            .dirs_len = 0};
         if (browser.name == NULL) return -1;
         if (browser.dirs == NULL) return -1;
 
@@ -676,14 +675,15 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
                         break;
                     }
                 }
-                rewind (exclude_fp);
+                if (fseek (exclude_fp, 0L, SEEK_SET) == -1) return -1;
+                clearerr (exclude_fp);
 
                 if (exclude) continue;
             }
 
-            struct Dir dir = { .path = strdup (path),
-                               .dirname = strdup (basename (path)),
-                               .type = type };
+            struct Dir dir = {.path = strdup (path),
+                              .dirname = strdup (basename (path)),
+                              .type = type};
 
             if (dir.path == NULL) return -1;
             if (dir.dirname == NULL) return -1;
@@ -815,7 +815,7 @@ int do_action (int action) {
         int count = 0;
         // TODO: remove browser directories in tmpfs and backup on full unsync
         // TODO: check if directories are read writable first
-        // TODO: handle seteuid errors (immediately!)
+        // TODO: handle seteuid errors
         // TODO: fix clang-tidy errors
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
@@ -825,8 +825,8 @@ int do_action (int action) {
             // exists
             if (action == 's' && lockexists_dir (dir)) {
                 continue;
-            } else if ((action == 'u' || action == 'r')
-                       && !lockexists_dir (dir)) {
+            }
+            if ((action == 'u' || action == 'r') && !lockexists_dir (dir)) {
                 continue;
             }
 
@@ -900,8 +900,8 @@ int recover (const char *path, const char *browsername) {
         goto exit;
     }
 
-    if (chdir (CONFDIR_CRASHDIR) == -1 || mkdir_p (browsername, 0755) == -1
-        || chdir (browsername) == -1) {
+    if (chdir (CONFDIR_CRASHDIR) == -1 || mkdir_p (browsername, 0755) == -1 ||
+        chdir (browsername) == -1) {
         err = -1;
         goto exit;
     }
@@ -1180,7 +1180,6 @@ int clear_recovery (void) {
     if (buf == NULL) return -1;
 
     for (size_t b = 0; b < browsers_len; b++) {
-
         struct Browser browser = browsers[b];
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
@@ -1265,20 +1264,20 @@ int mount_overlay (void) {
     if (mkdir_p (".bor-upper", 0755) == -1) return -1;
     if (mkdir_p (".bor-work", 0755) == -1) return -1;
 
-    const char *data
-        = print2string ("lowerdir=%s,upperdir=.bor-upper,workdir=.bor-work",
-                        CONFDIR_BACKUPSDIR);
+    const char *data =
+        print2string ("lowerdir=%s,upperdir=.bor-upper,workdir=.bor-work",
+                      CONFDIR_BACKUPSDIR);
     unsigned long flags = MS_NOATIME | MS_NODEV | MS_NOSUID;
 
-    seteuid (0);
+    if (seteuid (0) == -1) return -1;
     if (mount ("overlay", TMPFSDIR, "overlay", flags, data) == -1) {
-        seteuid (USERID);
+        if (seteuid (USERID) == -1) return -1;
         LOG (LOG_ERROR, "failed mounting overlay filesystem");
         remove_r (".bor-upper");
         remove_r (".bor-work");
         return -1;
     }
-    seteuid (USERID);
+    if (seteuid (USERID) == -1) return -1;
 
     return 0;
 }
@@ -1305,13 +1304,15 @@ int unmount_overlay (void) {
 
     LOG (LOG_INFO, "umounting overlay filesystem");
 
-    seteuid (0);
+    if (seteuid (0) == -1) return -1;
+    ;
     if (umount2 (TMPFSDIR, UMOUNT_NOFOLLOW) == -1) {
-        seteuid (USERID);
+        if (seteuid (USERID) == -1) return -1;
         LOG (LOG_ERROR, "failed unmounting overlay filesystem");
         return -1;
     }
-    seteuid (USERID);
+    if (seteuid (USERID) == -1) return -1;
+    ;
 
     if (chdir (RUNTIMEDIR) == -1) return -1;
 
@@ -1327,10 +1328,12 @@ int unmount_overlay (void) {
     // work dir needs perms to remove
     if (seteuid (0) == -1) return -1;
     if (remove_r (".bor-work") == -1) {
-        seteuid (USERID);
+        if (seteuid (USERID) == -1) return -1;
+        ;
         return -1;
     }
-    seteuid (USERID);
+    if (seteuid (USERID) == -1) return -1;
+    ;
 
     return 0;
 }

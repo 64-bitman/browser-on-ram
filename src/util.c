@@ -14,7 +14,7 @@
 #include <time.h>
 #include <unistd.h>
 
-static char *loglevels_str[] = { "ERROR", "WARN", "INFO", "DEBUG" };
+static char *loglevels_str[] = {"ERROR", "WARN", "INFO", "DEBUG"};
 enum LogLevel LOG_LEVEL = LOG_INFO;
 
 void log_print (enum LogLevel level, const char *file, const int line,
@@ -24,8 +24,8 @@ void log_print (enum LogLevel level, const char *file, const int line,
     }
 
     va_list args;
-    int size
-        = snprintf (NULL, 0, "%s: %s:%d: ", loglevels_str[level], file, line);
+    int size =
+        snprintf (NULL, 0, "%s: %s:%d: ", loglevels_str[level], file, line);
     char buf[strlen (format) + size + 2];
 
     memset (buf, 0, sizeof (buf));
@@ -122,7 +122,7 @@ int remove_r (const char *path) {
     if (prevcwd == NULL) return -1;
 
     if (chdir (path) == -1) return -1;
-    char *paths[] = { ".", NULL };
+    char *paths[] = {".", NULL};
 
     FTS *ftsp = fts_open (paths, FTS_PHYSICAL | FTS_NOSTAT | FTS_XDEV, NULL);
     FTSENT *ent = NULL;
@@ -210,15 +210,15 @@ off_t get_dir_size (const char *path) {
 
     if (chdir (path) == -1) return -1;
 
-    char *paths[] = { ".", NULL };
+    char *paths[] = {".", NULL};
 
     FTS *ftsp = fts_open (paths, FTS_PHYSICAL | FTS_XDEV, NULL);
     FTSENT *ent = NULL;
     off_t size = 0;
 
     while ((ent = fts_read (ftsp)) != NULL) {
-        if (ent->fts_info == FTS_F || ent->fts_info == FTS_NSOK
-            || ent->fts_info == FTS_DEFAULT) {
+        if (ent->fts_info == FTS_F || ent->fts_info == FTS_NSOK ||
+            ent->fts_info == FTS_DEFAULT) {
             size += ent->fts_statp->st_size;
         }
     }
@@ -234,7 +234,7 @@ off_t get_dir_size (const char *path) {
 }
 
 char *human_readable (off_t bytes) {
-    char *suffix[] = { "B", "KB", "MB", "GB", "TB" };
+    char *suffix[] = {"B", "KB", "MB", "GB", "TB"};
     char length = sizeof (suffix) / sizeof (suffix[0]);
 
     int i = 0;

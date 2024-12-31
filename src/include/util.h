@@ -23,15 +23,15 @@ int mkdir_p (const char *path, mode_t mode);
 int move (const char *oldpath, const char *newpath);
 int get_bool (const char *value);
 
-#define __TO_STRING(s) #s
-#define TO_STRING(s) __TO_STRING (s)
+#define TO__STRING(s) #s
+#define TO_STRING(s) TO__STRING (s)
 
 #define EXISTS(path) (stat (path, &sb) == 0)
 #define DIREXISTS(path) (lstat (path, &sb) == 0 && S_ISDIR (sb.st_mode))
 #define SYMEXISTS(path) (lstat (path, &sb) == 0 && S_ISLNK (sb.st_mode))
 #define LEXISTS(path) (lstat (path, &sb) == 0)
 
-#define LOG(level, format, ...)                                               \
+#define LOG(level, format, ...)                                                \
     log_print (level, __FILE__, __LINE__, format, ##__VA_ARGS__)
 
 // ansi escape codes
@@ -50,21 +50,21 @@ int get_bool (const char *value);
 #ifdef DEBUG
 
     #define PERROR() perror (__FILE__ ":" TO_STRING (__LINE__) " Error");
-    #define LOGCWD()                                                          \
-        do {                                                                  \
-            int perrno = errno;                                               \
-            char *CWD = get_current_dir_name ();                              \
-            LOG (LOG_DEBUG, "Current working directory is %s", CWD);          \
-            errno = perrno;                                                   \
+    #define LOGCWD()                                                           \
+        do {                                                                   \
+            int perrno = errno;                                                \
+            char *CWD = get_current_dir_name ();                               \
+            LOG (LOG_DEBUG, "Current working directory is %s", CWD);           \
+            errno = perrno;                                                    \
         } while (0)
 
 #else
 
-    #define PERROR()                                                          \
-        do {                                                                  \
+    #define PERROR()                                                           \
+        do {                                                                   \
         } while (0)
-    #define LOGCWD()                                                          \
-        do {                                                                  \
+    #define LOGCWD()                                                           \
+        do {                                                                   \
         } while (0)
 
 #endif
