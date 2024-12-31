@@ -9,12 +9,13 @@ REL_PREFIX := release
 DEBUG_PREFIX := debug
 
 ifeq ($(RELEASE), 1)
-BUILD_DIR := build/$(REL_PREFIX)
-CFLAGS += $(REL_FLAGS)
+	BUILD_DIR := build/$(REL_PREFIX)
+	CFLAGS += $(REL_FLAGS)
 else
-BUILD_DIR := build/$(DEBUG_PREFIX)
-CFLAGS += $(DEBUG_FLAGS)
+	BUILD_DIR := build/$(DEBUG_PREFIX)
+	CFLAGS += $(DEBUG_FLAGS)
 endif
+
 
 BIN_PATH := $(BUILD_DIR)/bin
 OBJ_PATH := $(BUILD_DIR)/bin
@@ -47,7 +48,6 @@ $(TARGET): $(OBJ)
 $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/$(notdir $(basename $@).d) -o $@ -c $<
 
-
 install:
 	install -dm 755 $(PREFIX)/share/bor/scripts
 	install -dm 755 $(PREFIX)/lib/systemd/user
@@ -55,21 +55,30 @@ install:
 	install -Dm 644 scripts/browsers/*.sh $(PREFIX)/share/bor/scripts
 	install -Dm 644 systemd/* $(PREFIX)/lib/systemd/user
 
+install_setuid:
+	chown root:root $(PREFIX)/bin/bor
+	chmod u+s $(PREFIX)/bin/bor
+
 test: all
 	test/start-test $(BUILD_DIR)/bin/bor
 
 sync: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --sync
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --sync
 
 unsync: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --unsync
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --unsync
 
 resync: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --resync
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --resync
 
 status: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs/bor --status
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --status
+
+setuid:
+	sudo chown root:root $(TARGET)
+	sudo chmod u+s $(TARGET)
+
 
 -include $(DEPS)
 
-.PHONY: all clean prebuild install rebuild test sync unsync resync
+.PHONY: all clean prebuild install rebuild test sync unsync resync setuid

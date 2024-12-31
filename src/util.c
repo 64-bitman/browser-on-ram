@@ -74,7 +74,6 @@ char *trim (char *str) {
 }
 
 int copy_r (const char *src, const char *dest) {
-    errno = 0;
     struct stat sb;
 
     if (stat (src, &sb) == -1) {
@@ -107,13 +106,13 @@ int copy_r (const char *src, const char *dest) {
 }
 
 int remove_r (const char *path) {
-    errno = 0;
+    int preverrno = errno;
     struct stat sb;
 
     if (stat (path, &sb) == -1) {
         return -1;
     }
-    // if its not a dir just remove it
+    // if its a file remove it
     if (!S_ISDIR (sb.st_mode)) {
         remove (path);
         return 0;
@@ -128,6 +127,8 @@ int remove_r (const char *path) {
 
     FTS *ftsp = fts_open (paths, FTS_PHYSICAL | FTS_NOSTAT | FTS_XDEV, NULL);
     FTSENT *ent = NULL;
+
+    if (ftsp == NULL) return -1;
 
     while ((ent = fts_read (ftsp)) != NULL) {
         if (ent->fts_info == FTS_D || ent->fts_info == FTS_ERR) {
@@ -145,10 +146,11 @@ int remove_r (const char *path) {
     free (prevcwd);
 
     chmod (path, 0755);
+    // remove() sets errno to EISDIR if removing a directory?
     if (remove (path) == -1) {
         return -1;
     }
-
+    errno = preverrno;
     return 0;
 }
 
@@ -198,7 +200,6 @@ pid_t pgrep (const char *name) {
 }
 
 off_t get_dir_size (const char *path) {
-    errno = 0;
     struct stat sb;
 
     if (stat (path, &sb) == -1) {
@@ -277,7 +278,6 @@ int systemd_userservice_active (const char *name) {
 }
 
 int mkdir_p (const char *path, mode_t mode) {
-    errno = 0;
     char *path_cpy = strdup (path);
 
     if (path_cpy == NULL) return -1;
@@ -311,7 +311,6 @@ int mkdir_p (const char *path, mode_t mode) {
 // move directory, either by moving it or copying it if on different
 // filesystems
 int move (const char *oldpath, const char *newpath) {
-    errno = 0;
     struct stat sb;
 
     if (stat (newpath, &sb) == 0) {
@@ -328,4 +327,14 @@ int move (const char *oldpath, const char *newpath) {
     if (copy_r (oldpath, newpath) == -1) return -1;
     if (remove_r (oldpath) == -1) return -1;
     return 0;
+}
+
+// return true if string is true/1 or false if string is false/0, else -1
+int get_bool (const char *value) {
+    if (strcmp (value, "true") == 0 || strcmp (value, "1") == 0) {
+        return true;
+    } else if (strcmp (value, "false") == 0 || strcmp (value, "0") == 0) {
+        return false;
+    }
+    return -1;
 }

@@ -12,8 +12,10 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
+#include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/vfs.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -34,14 +36,15 @@
 #endif
 
 static char *HOMEDIR = NULL;
+static char *RUNTIMEDIR = NULL;
 static char *CONFDIR = NULL;
 static char *CONFDIR_BACKUPSDIR = NULL;
 static char *CONFDIR_CRASHDIR = NULL;
 static char *TMPFSDIR = NULL;
 static char *SCRIPTDIR = NULL;
 static int IGNORE_CHECK = false;
+static int SETUID = false;
 static uid_t USERID = 0;
-static gid_t GROUPID = 0;
 
 enum DirType { TYPE_PROFILE = 1, TYPE_CACHE, TYPES_LEN };
 
@@ -59,11 +62,31 @@ struct Browser {
     size_t dirs_len;
 };
 
+struct Config {
+    int enable_overlay;
+} CONFIG = { 0 };
+
+static const struct option opts[]
+    = { { "sync", no_argument, NULL, 's' },
+        { "unsync", no_argument, NULL, 'u' },
+        { "resync", no_argument, NULL, 'r' },
+        { "status", no_argument, NULL, 'p' },
+        { "clear", no_argument, NULL, 'x' },
+        { "ignore", no_argument, NULL, 'i' },
+        { "config", required_argument, NULL, 'c' },
+        { "sharedir", required_argument, NULL, 'd' },
+        { "runtimedir", required_argument, NULL, 't' },
+        { "verbose", no_argument, NULL, 'v' },
+        { "version", no_argument, NULL, 'V' },
+        { "help", no_argument, NULL, 'h' },
+        { 0, 0, 0, 0 } };
+
 void help (void);
 int status (void);
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 
 int init (void);
+int init_config (void);
 
 int setlock_dir (const struct Dir dir, int locked);
 int lockexists_dir (const struct Dir dir);
@@ -75,30 +98,46 @@ int unsync_dir (const struct Dir dir, const char *browsername);
 int resync_dir (const struct Dir dir, const char *browsername);
 
 int clear_recovery (void);
+int mount_overlay (void);
+int unmount_overlay (void);
+int overlay_exists (void);
 
 int main (int argc, char **argv) {
-    srand (time (NULL));
     errno = 0;
 
-    struct option opts[] = { { "sync", no_argument, NULL, 's' },
-                             { "unsync", no_argument, NULL, 'u' },
-                             { "resync", no_argument, NULL, 'r' },
-                             { "status", no_argument, NULL, 'p' },
-                             { "clear", no_argument, NULL, 'x' },
-                             { "ignore", no_argument, NULL, 'i' },
-                             { "config", required_argument, NULL, 'c' },
-                             { "sharedir", required_argument, NULL, 'd' },
-                             { "tmpfs", required_argument, NULL, 't' },
-                             { "verbose", no_argument, NULL, 'v' },
-                             { "version", no_argument, NULL, 'V' },
-                             { "help", no_argument, NULL, 'h' },
-                             { 0, 0, 0, 0 } };
+    // too lazy to handle setgid (no use anyways);
+    if (getegid () != getgid ()) {
+        printf ("program has setgid bit, aborting\n");
+        return 1;
+    }
+
+    // save user id to switch back after escalation
+    USERID = getuid ();
+
+    // drop permissions immediately if setuid bit is set
+    // we only escalate when mounting overlay
+    if (geteuid () == 0) {
+        SETUID = true;
+
+        if (seteuid (USERID) == -1) {
+            printf ("seteuid failed\n");
+            PERROR ();
+            return 1;
+        };
+    } else if (geteuid () != getuid ()) {
+        // abort if setuid is set but it is not root
+        printf (
+            "program is not owned by root but has a setuid bit, aborting\n");
+        return 1;
+    }
+
     int opt;
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts, &longindex))
-           != -1) {
+    while (
+        (opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts, &longindex))
+        != -1) {
         switch (opt) {
         case 's':
             action = 's';
@@ -113,7 +152,7 @@ int main (int argc, char **argv) {
             LOG_LEVEL = LOG_DEBUG;
             break;
         case 'V':
-            printf("BROWSER-ON-RAM "VERSION"\n");
+            printf ("BROWSER-ON-RAM " VERSION "\n");
             return 0;
         case 'p':
             action = 'p';
@@ -165,11 +204,11 @@ int main (int argc, char **argv) {
             break;
         }
         case 't': {
-            TMPFSDIR = realpath (optarg, NULL);
+            RUNTIMEDIR = realpath (optarg, NULL);
 
-            if (TMPFSDIR == NULL) {
+            if (RUNTIMEDIR == NULL) {
                 PERROR ();
-                LOG (LOG_ERROR, "tmpfs directory does not exist");
+                LOG (LOG_ERROR, "runtime directory does not exist");
                 return 1;
             }
             break;
@@ -189,9 +228,21 @@ int main (int argc, char **argv) {
         help ();
         return 0;
     }
+    if (SETUID == true) {
+        LOG (LOG_DEBUG,
+             "running as setuid program, real userid: %d | effective userid: "
+             "%d",
+             getuid (), geteuid ());
+    }
 
     if (init () == -1) {
         LOG (LOG_ERROR, "failed initializing");
+        PERROR ();
+        return 1;
+    }
+
+    if (init_config () == -1) {
+        LOG (LOG_ERROR, "failed reading config");
         PERROR ();
         return 1;
     }
@@ -241,8 +292,9 @@ void help (void) {
     printf ("-i, --ignore           ignore safety & lock checks\n");
     printf ("-c, --config           override config directory location\n");
     printf ("-d, --sharedir         override data/share directory location\n");
-    printf ("-t, --tmpfs            override tmpfs directory location\n");
+    printf ("-t, --runtimedir       override runtime directory location\n");
     printf ("-v, --verbose          enable debug logs\n");
+    printf ("-V, --version          show program version\n");
     printf ("-h, --help             show this message\n\n");
     printf ("It is not recommended to use sync, unsync, or resync standalone.\n");
     printf ("Please use the systemd user service instead\n");
@@ -348,20 +400,16 @@ int status (void) {
 // initialize required dirs and create browsers.conf template
 int init (void) {
     errno = 0;
-    struct passwd *pw = getpwuid (getuid ());
+    struct passwd *pw = getpwuid (USERID);
 
     HOMEDIR = strdup (pw->pw_dir);
-    USERID = pw->pw_uid;
-    GROUPID = pw->pw_gid;
 
-    if (HOMEDIR == NULL) {
-        return -1;
-    }
+    if (HOMEDIR == NULL) return -1;
 
     // only set confdir if it wasnt given by user
     if (CONFDIR == NULL) {
         // follow XDG base spec
-        char *xdgconfighome = getenv ("XDG_CONFIG_HOME");
+        char *xdgconfighome = secure_getenv ("XDG_CONFIG_HOME");
 
         if (xdgconfighome == NULL) {
             CONFDIR = print2string ("%s/.config/bor", HOMEDIR);
@@ -372,16 +420,24 @@ int init (void) {
     CONFDIR_BACKUPSDIR = print2string ("%s/backups", CONFDIR);
     CONFDIR_CRASHDIR = print2string ("%s/crash-reports", CONFDIR);
 
-    if (TMPFSDIR == NULL) {
-        char *xdgruntimedir = getenv ("XDG_RUNTIME_DIR");
+    char *xdgruntimedir = secure_getenv ("XDG_RUNTIME_DIR");
 
+    if (RUNTIMEDIR == NULL) {
         if (xdgruntimedir == NULL) {
-            TMPFSDIR = print2string ("/run/user/%d/bor", pw->pw_uid);
+            RUNTIMEDIR = print2string ("/run/user/%d", USERID);
+            TMPFSDIR = print2string ("%s/bor", RUNTIMEDIR, USERID);
         } else {
+            RUNTIMEDIR = strdup (xdgruntimedir);
             TMPFSDIR = print2string ("%s/bor", xdgruntimedir);
         }
+    } else {
+        TMPFSDIR = print2string ("%s/bor", RUNTIMEDIR, USERID);
     }
 
+    if (RUNTIMEDIR == NULL) return -1;
+
+    // check if user has set sharedir (therefor scriptdir), else use the macro
+    // value
     if (SCRIPTDIR == NULL) {
         SCRIPTDIR = strdup (SHAREDIR "/bor/scripts");
     }
@@ -393,6 +449,7 @@ int init (void) {
     }
 
     LOG (LOG_DEBUG, "home directory is %s", HOMEDIR);
+    LOG (LOG_DEBUG, "runtime directory is %s", RUNTIMEDIR);
     LOG (LOG_DEBUG, "conf directory is %s", CONFDIR);
     LOG (LOG_DEBUG, "tmpfs directory is %s", TMPFSDIR);
     LOG (LOG_DEBUG, "script directory is %s", SCRIPTDIR);
@@ -415,14 +472,80 @@ int init (void) {
     if (chdir (CONFDIR) == -1) return -1;
 
     if (!EXISTS ("browsers.conf")) {
-        int fd = creat ("browsers.conf", 0644);
+        FILE *bcfp = fopen ("browsers.conf", "w");
 
-        dprintf (fd, "# each line corrosponds to a browser that should be "
-                     "synced, ex:\n");
-        dprintf (fd, "# firefox\n# chromium\n");
+        if (bcfp == NULL) {
+            LOG (LOG_ERROR, "failed creating browser.conf");
+            return -1;
+        }
 
-        close (fd);
+        fprintf (bcfp, "# each line corrosponds to a browser that should be "
+                       "synced, ex:\n");
+        fprintf (bcfp, "# firefox\n# chromium\n");
+
+        fclose (bcfp);
     }
+
+    return 0;
+}
+
+// read & initialize config file & config structure
+int init_config (void) {
+    errno = 0;
+    struct stat sb;
+
+    // defaults
+    CONFIG.enable_overlay = false;
+
+    if (chdir (CONFDIR) == -1) return -1;
+    // don't read if config file doesnt exist
+    if (!EXISTS ("bor.conf")) return 0;
+
+    FILE *conf_fp = fopen ("bor.conf", "r");
+
+    if (conf_fp == NULL) {
+        LOG (LOG_ERROR, "failed opening bor.conf");
+        return -1;
+    }
+
+    char *buf = NULL;
+    size_t buf_size;
+
+    // config file format: <key>=<value>
+    while (getline (&buf, &buf_size, conf_fp) != -1) {
+        buf = trim (buf);
+
+        char *equal_sign = strchr (buf, '=');
+
+        if (equal_sign == NULL) {
+            LOG (LOG_WARN, "invalid config option %s", buf);
+            continue;
+        }
+
+        char *key = buf, *value = equal_sign + 1;
+
+        *equal_sign = 0; // split key and value
+        key = trim (key);
+        value = trim (value);
+
+        // read config
+        if (strcmp (key, "enable_overlay") == 0) {
+            int boolean = get_bool (value);
+
+            if (boolean == -1) {
+                LOG (LOG_WARN, "invalid value for config option %s = %s",
+                     value, key);
+                continue;
+            }
+            CONFIG.enable_overlay = boolean;
+        } else {
+            LOG (LOG_WARN, "unknown config option %s = %s", key, value);
+        }
+        LOG (LOG_DEBUG, "received config option %s = %s", key, value);
+    }
+
+    free (buf);
+    fclose (conf_fp);
 
     return 0;
 }
@@ -512,7 +635,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         while (getline (&buf, &buf_size, pp) != -1) {
             buf = trim (buf);
 
-            // set space between <dirtype> and <path> to NULL so we only see dirtype part
+            // set space between <dirtype> and <path> to NULL so we only see
+            // dirtype part
             char *delim = strchr (buf, ' ');
 
             if (delim == NULL) {
@@ -657,6 +781,21 @@ int do_action (int action) {
         }
     }
 
+    // mount overlay filesystem
+    if (CONFIG.enable_overlay && action == 's') {
+        if (SETUID) {
+            if (mount_overlay () == -1) {
+                LOG (LOG_ERROR, "could not mount overlay");
+                PERROR ();
+                return -1;
+            }
+        } else {
+            LOG (LOG_WARN,
+                 "unable to mount overlay filesystem because setuid bit "
+                 "is not configured");
+        }
+    }
+
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
 
@@ -674,14 +813,18 @@ int do_action (int action) {
             LOG (LOG_INFO, "resyncing %s", browser.name);
         }
         int count = 0;
+        // TODO: remove browser directories in tmpfs and backup on full unsync
+        // TODO: check if directories are read writable first
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
 
-            // sync only if lock doesn't exists and unsync/resync only if lock exists
+            // sync only if lock doesn't exists and unsync/resync only if lock
+            // exists
             if (action == 's' && lockexists_dir (dir)) {
                 continue;
-            } else if ((action == 'u' || action == 'r') && !lockexists_dir (dir)) {
+            } else if ((action == 'u' || action == 'r')
+                       && !lockexists_dir (dir)) {
                 continue;
             }
 
@@ -719,9 +862,20 @@ int do_action (int action) {
             count++;
         }
         if (count == 0) {
-            LOG (LOG_INFO, "no action done for any directory");
+            LOG (LOG_INFO, "%s: no action done for any directory ",
+                 browser.name);
         }
     }
+
+    // unmount overlay (always check)
+    if (action == 'u') {
+        if (unmount_overlay () == -1) {
+            LOG (LOG_ERROR, "could not unmount overlay");
+            PERROR ();
+            return -1;
+        }
+    }
+
     return 0;
 }
 
@@ -1042,7 +1196,8 @@ int clear_recovery (void) {
 
             while ((de = readdir (dp)) != NULL) {
                 if (de->d_type == DT_DIR) {
-                    // cut off -crashreport part and compare to original directory
+                    // cut off -crashreport part and compare to original
+                    // directory
                     char *str_start = strstr (de->d_name, "-crashreport");
 
                     // remove -crashreport* substring
@@ -1050,8 +1205,9 @@ int clear_recovery (void) {
                     char prevc = *str_start;
                     *str_start = 0;
 
-                    // skip if dirname without -crashreport doesn't match original directory
-                    // (we don't want to accidently non crash directories)
+                    // skip if dirname without -crashreport doesn't match
+                    // original directory (we don't want to accidently non
+                    // crash directories)
                     if (strcmp (de->d_name, dir.dirname) != 0) continue;
 
                     *str_start = prevc;
@@ -1071,4 +1227,134 @@ int clear_recovery (void) {
     }
     free (buf);
     return 0;
+}
+
+int mount_overlay (void) {
+    errno = 0;
+
+    if (!SETUID) {
+        LOG (LOG_ERROR, "cannot mount overlay filesystem, program does not "
+                        "have a setuid bit");
+        return -1;
+    }
+
+    int o_exists = overlay_exists ();
+
+    if (o_exists == true) {
+        LOG (LOG_ERROR, "overlay filesystem is already mounted");
+        return -1;
+    } else if (o_exists == -1) {
+        LOG (LOG_ERROR, "failed checking if overlay filesystem exists");
+        return -1;
+    }
+
+    LOG (LOG_INFO, "mounting overlay filesystem");
+
+    /*
+       How overlay works (should happen before directories are synced):
+       We set the entire backups directory as the lower directory
+       and a separate tmpfs directory as the upper dir and another one for the
+       workdir. The normal tmpfs dir is used as the "merged" directory browser.
+       Then profiles/caches are symlinked as normal
+    */
+
+    if (chdir (RUNTIMEDIR) == -1) return -1;
+
+    if (mkdir_p (".bor-upper", 0755) == -1) return -1;
+    if (mkdir_p (".bor-work", 0755) == -1) return -1;
+
+    const char *data
+        = print2string ("lowerdir=%s,upperdir=.bor-upper,workdir=.bor-work",
+                        CONFDIR_BACKUPSDIR);
+    unsigned long flags = MS_NOATIME | MS_NODEV | MS_NOSUID;
+
+    seteuid (0);
+    if (mount ("overlay", TMPFSDIR, "overlay", flags, data) == -1) {
+        seteuid (USERID);
+        LOG (LOG_ERROR, "failed mounting overlay filesystem");
+        remove_r (".bor-upper");
+        remove_r (".bor-work");
+        return -1;
+    }
+    seteuid (USERID);
+
+    return 0;
+}
+
+int unmount_overlay (void) {
+    errno = 0;
+    struct stat sb;
+
+    // check if overlay filesystem actually exists first
+    int o_exists = overlay_exists ();
+
+    if (o_exists == false) {
+        return 0;
+    } else if (o_exists == -1) {
+        LOG (LOG_ERROR, "failed checking if overlay filesystem exists");
+        return -1;
+    }
+
+    if (!SETUID) {
+        LOG (LOG_ERROR, "cannot unmount overlay filesystem, program does not "
+                        "have a setuid bit");
+        return -1;
+    }
+
+    LOG (LOG_INFO, "umounting overlay filesystem");
+
+    seteuid (0);
+    if (umount2 (TMPFSDIR, UMOUNT_NOFOLLOW) == -1) {
+        seteuid (USERID);
+        LOG (LOG_ERROR, "failed unmounting overlay filesystem");
+        return -1;
+    }
+    seteuid (USERID);
+
+    if (chdir (RUNTIMEDIR) == -1) return -1;
+
+    if (remove_r (".bor-upper") == -1) return -1;
+
+    // do not remove if .bor-work is a symlink
+    if (lstat (".bor-work", &sb) == -1) return -1;
+    if (S_ISLNK (sb.st_mode)) {
+        LOG (LOG_ERROR, "work directory for overlay filsystem is a symlink");
+        return -1;
+    }
+
+    // work dir needs perms to remove
+    if (seteuid (0) == -1) return -1;
+    if (remove_r (".bor-work") == -1) {
+        seteuid (USERID);
+        return -1;
+    }
+    seteuid (USERID);
+
+    return 0;
+}
+
+// return true/false if overlay exists/nonexistent on tmpfs, -1 on error
+int overlay_exists (void) {
+    struct stat sb, psb;
+
+    if (stat (TMPFSDIR, &sb) == -1) return -1;
+    if (stat (RUNTIMEDIR, &psb) == -1) return -1;
+
+    // tmpfs is not a mountpoint if device ids match
+    if (sb.st_dev == psb.st_dev) {
+        return false;
+    }
+
+    // check if filesystem type is overlay
+    struct statfs fsb;
+
+    if (statfs (TMPFSDIR, &fsb) == -1) return -1;
+    // OVERLAYFS_SUPER_MAGIC
+    if (fsb.f_type != 0x794c7630) {
+        LOG (LOG_ERROR, "tmpfs dir is on a different filesystem than the "
+                        "runtime directory");
+        return -1;
+    }
+
+    return true;
 }

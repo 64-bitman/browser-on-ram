@@ -21,6 +21,7 @@ char *replace_char (char *str, char target, char replace);
 int systemd_userservice_active (const char *name);
 int mkdir_p (const char *path, mode_t mode);
 int move (const char *oldpath, const char *newpath);
+int get_bool (const char *value);
 
 #define __TO_STRING(s) #s
 #define TO_STRING(s) __TO_STRING (s)
