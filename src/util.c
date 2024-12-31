@@ -98,7 +98,6 @@ int copy_r (const char *src, const char *dest) {
     free (cmd);
 
     if (status == -1 || status != 0) {
-        PERROR ();
         return -1;
     }
 

@@ -815,6 +815,8 @@ int do_action (int action) {
         int count = 0;
         // TODO: remove browser directories in tmpfs and backup on full unsync
         // TODO: check if directories are read writable first
+        // TODO: handle seteuid errors (immediately!)
+        // TODO: fix clang-tidy errors
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
