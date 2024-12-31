@@ -1,4 +1,4 @@
-BasedOnStyle: GNU
+BasedOnStyle: LLVM
 AlwaysBreakAfterDefinitionReturnType: None
 AlwaysBreakAfterReturnType: None
 IndentWidth: 4
@@ -7,3 +7,4 @@ AllowShortIfStatementsOnASingleLine: WithoutElse
 BreakBeforeBraces: Attach
 Language: Cpp
 IndentPPDirectives: BeforeHash
+SpaceBeforeParens: Always
