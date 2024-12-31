@@ -15,6 +15,7 @@
 #include <sys/mount.h>
 #include <sys/stat.h>
 #include <sys/types.h>
+#include <sys/vfs.h>
 #include <time.h>
 #include <unistd.h>
 
@@ -97,7 +98,9 @@ int unsync_dir (const struct Dir dir, const char *browsername);
 int resync_dir (const struct Dir dir, const char *browsername);
 
 int clear_recovery (void);
-int mount_overlayfs (const char *upper, const char *lower);
+int mount_overlay (void);
+int unmount_overlay (void);
+int overlay_exists (void);
 
 int main (int argc, char **argv) {
     errno = 0;
@@ -778,6 +781,21 @@ int do_action (int action) {
         }
     }
 
+    // mount overlay filesystem
+    if (CONFIG.enable_overlay && action == 's') {
+        if (SETUID) {
+            if (mount_overlay () == -1) {
+                LOG (LOG_ERROR, "could not mount overlay");
+                PERROR ();
+                return -1;
+            }
+        } else {
+            LOG (LOG_WARN,
+                 "unable to mount overlay filesystem because setuid bit "
+                 "is not configured");
+        }
+    }
+
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
 
@@ -795,6 +813,8 @@ int do_action (int action) {
             LOG (LOG_INFO, "resyncing %s", browser.name);
         }
         int count = 0;
+        // TODO: remove browser directories in tmpfs and backup on full unsync
+        // TODO: check if directories are read writable first
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
@@ -842,9 +862,20 @@ int do_action (int action) {
             count++;
         }
         if (count == 0) {
-            LOG (LOG_INFO, "no action done for any directory");
+            LOG (LOG_INFO, "%s: no action done for any directory ",
+                 browser.name);
         }
     }
+
+    // unmount overlay (always check)
+    if (action == 'u') {
+        if (unmount_overlay () == -1) {
+            LOG (LOG_ERROR, "could not unmount overlay");
+            PERROR ();
+            return -1;
+        }
+    }
+
     return 0;
 }
 
@@ -1198,10 +1229,132 @@ int clear_recovery (void) {
     return 0;
 }
 
-int mount_overlayfs (const char *upper, const char *lower) {
-    (void)upper;
-    (void)lower;
+int mount_overlay (void) {
     errno = 0;
 
+    if (!SETUID) {
+        LOG (LOG_ERROR, "cannot mount overlay filesystem, program does not "
+                        "have a setuid bit");
+        return -1;
+    }
+
+    int o_exists = overlay_exists ();
+
+    if (o_exists == true) {
+        LOG (LOG_ERROR, "overlay filesystem is already mounted");
+        return -1;
+    } else if (o_exists == -1) {
+        LOG (LOG_ERROR, "failed checking if overlay filesystem exists");
+        return -1;
+    }
+
+    LOG (LOG_INFO, "mounting overlay filesystem");
+
+    /*
+       How overlay works (should happen before directories are synced):
+       We set the entire backups directory as the lower directory
+       and a separate tmpfs directory as the upper dir and another one for the
+       workdir. The normal tmpfs dir is used as the "merged" directory browser.
+       Then profiles/caches are symlinked as normal
+    */
+
+    if (chdir (RUNTIMEDIR) == -1) return -1;
+
+    if (mkdir_p (".bor-upper", 0755) == -1) return -1;
+    if (mkdir_p (".bor-work", 0755) == -1) return -1;
+
+    const char *data
+        = print2string ("lowerdir=%s,upperdir=.bor-upper,workdir=.bor-work",
+                        CONFDIR_BACKUPSDIR);
+    unsigned long flags = MS_NOATIME | MS_NODEV | MS_NOSUID;
+
+    seteuid (0);
+    if (mount ("overlay", TMPFSDIR, "overlay", flags, data) == -1) {
+        seteuid (USERID);
+        LOG (LOG_ERROR, "failed mounting overlay filesystem");
+        remove_r (".bor-upper");
+        remove_r (".bor-work");
+        return -1;
+    }
+    seteuid (USERID);
+
     return 0;
+}
+
+int unmount_overlay (void) {
+    errno = 0;
+    struct stat sb;
+
+    // check if overlay filesystem actually exists first
+    int o_exists = overlay_exists ();
+
+    if (o_exists == false) {
+        return 0;
+    } else if (o_exists == -1) {
+        LOG (LOG_ERROR, "failed checking if overlay filesystem exists");
+        return -1;
+    }
+
+    if (!SETUID) {
+        LOG (LOG_ERROR, "cannot unmount overlay filesystem, program does not "
+                        "have a setuid bit");
+        return -1;
+    }
+
+    LOG (LOG_INFO, "umounting overlay filesystem");
+
+    seteuid (0);
+    if (umount2 (TMPFSDIR, UMOUNT_NOFOLLOW) == -1) {
+        seteuid (USERID);
+        LOG (LOG_ERROR, "failed unmounting overlay filesystem");
+        return -1;
+    }
+    seteuid (USERID);
+
+    if (chdir (RUNTIMEDIR) == -1) return -1;
+
+    if (remove_r (".bor-upper") == -1) return -1;
+
+    // do not remove if .bor-work is a symlink
+    if (lstat (".bor-work", &sb) == -1) return -1;
+    if (S_ISLNK (sb.st_mode)) {
+        LOG (LOG_ERROR, "work directory for overlay filsystem is a symlink");
+        return -1;
+    }
+
+    // work dir needs perms to remove
+    if (seteuid (0) == -1) return -1;
+    if (remove_r (".bor-work") == -1) {
+        seteuid (USERID);
+        return -1;
+    }
+    seteuid (USERID);
+
+    return 0;
+}
+
+// return true/false if overlay exists/nonexistent on tmpfs, -1 on error
+int overlay_exists (void) {
+    struct stat sb, psb;
+
+    if (stat (TMPFSDIR, &sb) == -1) return -1;
+    if (stat (RUNTIMEDIR, &psb) == -1) return -1;
+
+    // tmpfs is not a mountpoint if device ids match
+    if (sb.st_dev == psb.st_dev) {
+        return false;
+    }
+
+    // check if filesystem type is overlay
+    struct statfs fsb;
+
+    if (statfs (TMPFSDIR, &fsb) == -1) return -1;
+    // OVERLAYFS_SUPER_MAGIC
+    if (fsb.f_type != 0x794c7630) {
+        LOG (LOG_ERROR, "tmpfs dir is on a different filesystem than the "
+                        "runtime directory");
+        return -1;
+    }
+
+    return true;
 }

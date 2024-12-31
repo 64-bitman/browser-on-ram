@@ -63,7 +63,7 @@ test: all
 	test/start-test $(BUILD_DIR)/bin/bor
 
 sync: all
-	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs--sync
+	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --sync
 
 unsync: all
 	$(BUILD_DIR)/bin/bor -v -c test/config/bor -d test/share/bor -t test/tmpfs --unsync

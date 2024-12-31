@@ -3,6 +3,9 @@
 bor="$(realpath $1)"
 
 cd $(dirname $(realpath $0))
+
+mountpoint tmpfs/bor && sudo umount tmpfs/bor
+
 rm -rf config tmpfs share test-browser
 
 mkdir -p config/bor
@@ -24,14 +27,14 @@ echo cache \$root/cache.two
 EOT
 
 cat <<EOT > config/bor/bor.conf
-enable_overlay = false
+enable_overlay = true
 EOT
 
 sed -i -e 's/\\//g' share/bor/scripts/test-browser.sh
 
 echo -e "SYNCING"
 
-$bor -v -c config/bor -d share/bor -t tmpfs/bor --sync
+$bor -v -c config/bor -d share/bor -t tmpfs --sync
 
 [[ $? -ne 0 ]] && echo "sync returned bad exit"
 
@@ -41,7 +44,7 @@ tree -a --noreport
 
 echo -e "RESYNCING"
 
-$bor -v -c config/bor -d share/bor -t tmpfs/bor --resync
+$bor -v -c config/bor -d share/bor -t tmpfs --resync
 
 [[ $? -ne 0 ]] && echo "resync returned bad exit"
 
@@ -49,7 +52,7 @@ tree -a --noreport
 
 echo -e "UNSYNCING"
 
-$bor -v -c config/bor -d share/bor -t tmpfs/bor --unsync
+$bor -v -c config/bor -d share/bor -t tmpfs --unsync
 
 [[ $? -ne 0 ]] && echo "unsync returned bad exit"
 

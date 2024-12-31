@@ -106,12 +106,13 @@ int copy_r (const char *src, const char *dest) {
 }
 
 int remove_r (const char *path) {
+    int preverrno = errno;
     struct stat sb;
 
     if (stat (path, &sb) == -1) {
         return -1;
     }
-    // if its not a dir just remove it
+    // if its a file remove it
     if (!S_ISDIR (sb.st_mode)) {
         remove (path);
         return 0;
@@ -149,6 +150,7 @@ int remove_r (const char *path) {
     if (remove (path) == -1) {
         return -1;
     }
+    errno = preverrno;
     return 0;
 }
 
