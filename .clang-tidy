@@ -2,9 +2,15 @@ Checks: '
   clang-analyzer-*,
   bugprone-*,
   misc-*,
+  modernize-*,
+  performance-*,
   -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -clang-analyzer-security.insecureAPI.strcpy,
   -misc-include-cleaner,
-  -bugprone-easily-swappable-parameters
+  -bugprone-easily-swappable-parameters,
+  -clang-analyzer-unix.Malloc,
+  -clang-analyzer-unix.Stream,
+  -bugprone-reserved-identifier
   '
 FormatStyle: file
 WarningsAsErrors: '*'

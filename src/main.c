@@ -46,7 +46,7 @@ static int IGNORE_CHECK = false;
 static int SETUID = false;
 static uid_t USERID = 0;
 
-enum DirType { TYPE_PROFILE = 1, TYPE_CACHE, TYPES_LEN };
+enum DirType { TYPE_PROFILE = 1, TYPE_CACHE, TYPES_LEN, TYPES_ERROR };
 
 static const char *DirType_str[] = {NULL, "profile", "cache"};
 
@@ -339,6 +339,8 @@ int status (void) {
         DIR *dp = opendir (bcrashdir);
         struct dirent *de = NULL;
 
+        if (dp == NULL) return -1;
+
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
             off_t dir_size = get_dir_size (dir.path);
@@ -496,7 +498,11 @@ int init_config (void) {
     // defaults
     CONFIG.enable_overlay = false;
 
+    // clang-tidy for some reason says CONFDIR can be NULL?
+    if (CONFDIR == NULL) return -1;
+
     if (chdir (CONFDIR) == -1) return -1;
+
     // don't read if config file doesnt exist
     if (!EXISTS ("bor.conf")) return 0;
 
@@ -599,7 +605,9 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         // ignore comments (#)
         if (browsername[0] == '#') continue;
 
-        if (chdir (SCRIPTDIR) == -1) return -1;
+        if (chdir (SCRIPTDIR) == -1) {
+            return -1;
+        }
 
         char *filename = print2string ("%s.sh", browsername);
 
@@ -612,20 +620,27 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
         free (filename);
         char *cmd = print2string ("exec sh ./%s.sh", browsername);
-        if (cmd == NULL) return -1;
+        if (cmd == NULL) {
+            return -1;
+        }
 
         char *buf = NULL, *ebuf = NULL;
         size_t buf_size = 0, ebuf_size = 0;
         FILE *pp = popen (cmd, "r");
 
-        if (pp == NULL) return -1;
+        free (cmd);
+        if (pp == NULL) {
+            return -1;
+        }
 
         struct Browser browser = {
             .name = strdup (browsername),
             .dirs = calloc (MAX_DIRS, sizeof (*(browser.dirs))),
             .dirs_len = 0};
-        if (browser.name == NULL) return -1;
-        if (browser.dirs == NULL) return -1;
+
+        if (browser.name == NULL || browser.dirs == NULL) {
+            return -1;
+        }
 
         LOG (LOG_DEBUG, "got browser %s", browser.name);
 
@@ -644,7 +659,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
             }
 
             char *typestr = buf, *path = delim + 1;
-            enum DirType type = 0;
+            enum DirType type = TYPES_ERROR;
 
             *delim = 0;
 
@@ -658,7 +673,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
             // note: if path has a space in it and there is no dir type
             // then this will handle it
-            if (type == 0) {
+            if (type == TYPES_ERROR) {
                 LOG (LOG_WARN, "Unknown directory type '%'", typestr);
                 continue;
             }
@@ -685,8 +700,9 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
                               .dirname = strdup (basename (path)),
                               .type = type};
 
-            if (dir.path == NULL) return -1;
-            if (dir.dirname == NULL) return -1;
+            if (dir.path == NULL || dir.dirname == NULL) {
+                return -1;
+            }
 
             LOG (LOG_DEBUG, "received %s dir %s", DirType_str[type], dir.path);
 
@@ -701,7 +717,6 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         (*browsers)[*browsers_len] = browser;
         (*browsers_len)++;
 
-        free (cmd);
         free (buf);
         free (ebuf);
         pclose (pp);
@@ -924,7 +939,7 @@ int recover (const char *path, const char *browsername) {
     }
 
 exit:
-    chdir (prevcwd);
+    if (prevcwd != NULL) chdir (prevcwd);
     free (_path);
     free (rlpath);
     free (prevcwd);
@@ -1171,13 +1186,19 @@ int clear_recovery (void) {
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
 
-    if (read_browsersconf (&browsers, &browsers_len) == -1) return -1;
+    if (read_browsersconf (&browsers, &browsers_len) == -1) {
+        free (browsers);
+        return -1;
+    }
 
     LOG (LOG_INFO, "clearing recovery directories");
 
     char *buf = calloc (PATH_MAX + 1, sizeof (*buf));
 
-    if (buf == NULL) return -1;
+    if (buf == NULL) {
+        free (browsers);
+        return -1;
+    }
 
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
@@ -1190,8 +1211,11 @@ int clear_recovery (void) {
                       browser.name);
             DIR *dp = opendir (buf);
 
-            if (dp == NULL) return -1;
-            if (chdir (buf) == -1) return -1;
+            if (dp == NULL || chdir (buf) == -1) {
+                free (browsers);
+                free (buf);
+                return -1;
+            }
 
             struct dirent *de = NULL;
 
@@ -1226,6 +1250,7 @@ int clear_recovery (void) {
             closedir (dp);
         }
     }
+    free (browsers);
     free (buf);
     return 0;
 }
