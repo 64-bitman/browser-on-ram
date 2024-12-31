@@ -1,0 +1,11 @@
+Checks: '
+  clang-analyzer-*,
+  bugprone-*,
+  misc-*,
+  -clang-analyzer-security.insecureAPI.DeprecatedOrUnsafeBufferHandling,
+  -misc-include-cleaner,
+  -bugprone-easily-swappable-parameters
+  '
+FormatStyle: file
+WarningsAsErrors: '*'
+UseColor: true
