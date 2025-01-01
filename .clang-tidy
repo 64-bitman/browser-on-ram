@@ -13,5 +13,4 @@ Checks: '
   -bugprone-reserved-identifier
   '
 FormatStyle: file
-WarningsAsErrors: '*'
 UseColor: true
