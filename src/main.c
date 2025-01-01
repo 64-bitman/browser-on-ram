@@ -89,11 +89,12 @@ int init (void);
 int init_config (void);
 
 int setlock_dir (const struct Dir dir, int locked);
+void setlock_browsers (const struct Browser *browsers, size_t len, int locked);
 int lockexists_dir (const struct Dir dir);
 int do_action (int action);
 int recover (const char *path, const char *browsername);
 
-int sync_dir (const struct Dir dir, const char *browsername);
+int sync_dir (const struct Dir dir, const char *browsername, int overlay);
 int unsync_dir (const struct Dir dir, const char *browsername);
 int resync_dir (const struct Dir dir, const char *browsername);
 
@@ -104,11 +105,11 @@ int overlay_exists (void);
 
 // TODO: remove browser directories in tmpfs and backup on full unsync
 // TODO: check if directories are read writable first
-// TODO: handle seteuid errors
-// TODO: fix clang-tidy errors
 // TODO: show size of overlay in status
-// TODO: mount overlay filesystem after sync (upper already the size of merged
+// TODO: add config option to toggle backups for cache dirs
 // on start)
+// TODO: allow lock to exist in backup dirs too
+//       (so we don't have to set locks after syncing in case of overlayfs)
 
 int main (int argc, char **argv) {
     errno = 0;
@@ -769,6 +770,23 @@ int setlock_dir (const struct Dir dir, int locked) {
     return 0;
 }
 
+void setlock_browsers (const struct Browser *browsers, size_t len, int locked) {
+
+    for (size_t b = 0; b < len; b++) {
+        struct Browser browser = browsers[b];
+
+        for (size_t d = 0; d < browser.dirs_len; d++) {
+            struct Dir dir = browser.dirs[d];
+
+            if (setlock_dir (dir, locked) == -1) {
+                LOG (LOG_WARN, "failed setting/removing lock file for %s",
+                     dir.path);
+                PERROR ();
+            }
+        }
+    }
+}
+
 // return true or false if lock in dir.path exists
 int lockexists_dir (const struct Dir dir) {
     struct stat sb;
@@ -804,6 +822,18 @@ int do_action (int action) {
         }
     }
 
+    int is_overlay = false;
+
+    if (CONFIG.enable_overlay && action == 's') {
+        if (SETUID) {
+            is_overlay = true;
+        } else {
+            LOG (LOG_WARN,
+                 "unable to mount overlay filesystem because setuid bit "
+                 "is not configured");
+        }
+    }
+
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
 
@@ -835,30 +865,17 @@ int do_action (int action) {
             }
 
             if (action == 's') {
-                // if sync was successful, then set lock
-                if (sync_dir (dir, browser.name) == -1) {
+                // we set lock after fully syncing everything (in case of
+                // overlay fs)
+                if (sync_dir (dir, browser.name, is_overlay) == -1) {
                     LOG (LOG_WARN, "failed syncing %s", dir.path);
                     PERROR ();
-                } else {
-                    if (setlock_dir (dir, true) == -1) {
-                        LOG (LOG_WARN, "failed setting lock file for %s",
-                             dir.path);
-                        PERROR ();
-                    }
                 }
-
             } else if (action == 'u') {
                 if (unsync_dir (dir, browser.name) == -1) {
                     LOG (LOG_WARN, "failed unsyncing %s", dir.path);
                     PERROR ();
-                } else {
-                    if (setlock_dir (dir, false) == -1) {
-                        LOG (LOG_WARN, "failed unsetting lock file for %s",
-                             dir.path);
-                        PERROR ();
-                    }
                 }
-
             } else if (action == 'r') {
                 if (resync_dir (dir, browser.name) == -1) {
                     LOG (LOG_WARN, "failed resyncing %s", dir.path);
@@ -873,6 +890,15 @@ int do_action (int action) {
         }
     }
 
+    // mount overlay filesystem
+    if (is_overlay && action == 's') {
+        if (mount_overlay () == -1) {
+            LOG (LOG_ERROR, "could not mount overlay");
+            PERROR ();
+            return -1;
+        }
+    }
+
     // unmount overlay (always check)
     if (action == 'u') {
         if (unmount_overlay () == -1) {
@@ -880,6 +906,10 @@ int do_action (int action) {
             PERROR ();
             return -1;
         }
+
+        setlock_browsers (browsers, browsers_len, false);
+    } else if (action == 's') {
+        setlock_browsers (browsers, browsers_len, true);
     }
 
     return 0;
@@ -935,7 +965,7 @@ exit:
     return err;
 }
 
-int sync_dir (const struct Dir dir, const char *browsername) {
+int sync_dir (const struct Dir dir, const char *browsername, int overlay) {
     errno = 0;
     struct stat sb;
 
@@ -962,14 +992,9 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         // if backup copy exists too, then prioritize tmpfs copy over it
         if (LEXISTS (dir.path) && !backup_exists) {
             // only recover if its a profile directory
-            if (dir.type == TYPE_PROFILE) {
-                if (recover (dir.dirname, browsername) == -1) {
-                    LOG (LOG_ERROR, "failed recovering tmpfs");
-                    return -1;
-                }
-            } else {
-                LOG (LOG_WARN, "directory is cache, removing it");
-                remove_r (dir.dirname);
+            if (recover (dir.dirname, browsername) == -1) {
+                LOG (LOG_ERROR, "failed recovering tmpfs");
+                return -1;
             }
         } else {
             LOG (LOG_INFO, "using tmpfs copy instead of original directory");
@@ -1011,18 +1036,27 @@ int sync_dir (const struct Dir dir, const char *browsername) {
        2. move directory to backups
        3. symlink directory to tmpfs
 
-       if its an overlay then dont copy anything, only symlink
+       if its an overlay then dont copy to tmpfs
     */
+    char *tmpfs_rlpath = NULL;
 
     if (chdir (TMPFSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
-    if (copy_r (dir.path, dir.dirname) == -1) {
-        LOG (LOG_ERROR, "failed copying directory to tmpfs");
-        return -1;
-    }
+    if (overlay) {
+        // can't get tmpfs path via realpath(),
+        // so combine realpath of tmpfs dir + dirname
 
-    char *tmpfs_rlpath = realpath (dir.dirname, NULL);
+        char *tmp = realpath (".", NULL);
+
+        tmpfs_rlpath = print2string ("%s/%s", tmp, dir.dirname);
+    } else {
+        if (copy_r (dir.path, dir.dirname) == -1) {
+            LOG (LOG_ERROR, "failed copying directory to tmpfs");
+            return -1;
+        }
+        tmpfs_rlpath = realpath (dir.dirname, NULL);
+    }
 
     if (tmpfs_rlpath == NULL) return -1;
 
