@@ -102,6 +102,14 @@ int mount_overlay (void);
 int unmount_overlay (void);
 int overlay_exists (void);
 
+// TODO: remove browser directories in tmpfs and backup on full unsync
+// TODO: check if directories are read writable first
+// TODO: handle seteuid errors
+// TODO: fix clang-tidy errors
+// TODO: show size of overlay in status
+// TODO: mount overlay filesystem after sync (upper already the size of merged
+// on start)
+
 int main (int argc, char **argv) {
     errno = 0;
 
@@ -796,21 +804,6 @@ int do_action (int action) {
         }
     }
 
-    // mount overlay filesystem
-    if (CONFIG.enable_overlay && action == 's') {
-        if (SETUID) {
-            if (mount_overlay () == -1) {
-                LOG (LOG_ERROR, "could not mount overlay");
-                PERROR ();
-                return -1;
-            }
-        } else {
-            LOG (LOG_WARN,
-                 "unable to mount overlay filesystem because setuid bit "
-                 "is not configured");
-        }
-    }
-
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
 
@@ -828,10 +821,6 @@ int do_action (int action) {
             LOG (LOG_INFO, "resyncing %s", browser.name);
         }
         int count = 0;
-        // TODO: remove browser directories in tmpfs and backup on full unsync
-        // TODO: check if directories are read writable first
-        // TODO: handle seteuid errors
-        // TODO: fix clang-tidy errors
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
@@ -992,26 +981,23 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         }
     }
 
-    // backups are only for profile dirs
-    if (dir.type == TYPE_PROFILE) {
-        if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
-        if (chdir (browsername) == -1) return -1;
+    if (chdir (CONFDIR_BACKUPSDIR) == -1) return -1;
+    if (chdir (browsername) == -1) return -1;
 
-        if (LEXISTS (dir.dirname)) {
-            LOG (LOG_WARN, "found backup copy of directory");
-            if (EXISTS (dir.path)) {
-                if (recover (dir.dirname, browsername) == -1) {
-                    LOG (LOG_ERROR, "failed recovering backup");
-                    return -1;
-                }
-            } else {
-                LOG (LOG_INFO,
-                     "directory doesn't exist, using backup copy instead");
-
-                if (remove (dir.path) == -1) return -1;
-                ;
-                if (move (dir.dirname, dir.path) == -1) return -1;
+    if (LEXISTS (dir.dirname)) {
+        LOG (LOG_WARN, "found backup copy of directory");
+        if (EXISTS (dir.path)) {
+            if (recover (dir.dirname, browsername) == -1) {
+                LOG (LOG_ERROR, "failed recovering backup");
+                return -1;
             }
+        } else {
+            LOG (LOG_INFO,
+                 "directory doesn't exist, using backup copy instead");
+
+            if (remove (dir.path) == -1) return -1;
+            ;
+            if (move (dir.dirname, dir.path) == -1) return -1;
         }
     }
 
@@ -1021,29 +1007,19 @@ int sync_dir (const struct Dir dir, const char *browsername) {
     }
 
     /*
-       if profile:
        1. copy directory to tmpfs
        2. move directory to backups
        3. symlink directory to tmpfs
 
-       if cache:
-       1. move directory to tmpfs
-       3. symlink
+       if its an overlay then dont copy anything, only symlink
     */
 
     if (chdir (TMPFSDIR) == -1) return -1;
     if (chdir (browsername) == -1) return -1;
 
-    if (dir.type == TYPE_PROFILE) {
-        if (copy_r (dir.path, dir.dirname) == -1) {
-            LOG (LOG_ERROR, "failed copying directory to tmpfs");
-            return -1;
-        }
-    } else if (dir.type == TYPE_CACHE) {
-        if (move (dir.path, dir.dirname) == -1) {
-            LOG (LOG_ERROR, "failed moving directory to tmpfs");
-            return -1;
-        }
+    if (copy_r (dir.path, dir.dirname) == -1) {
+        LOG (LOG_ERROR, "failed copying directory to tmpfs");
+        return -1;
     }
 
     char *tmpfs_rlpath = realpath (dir.dirname, NULL);
@@ -1055,15 +1031,13 @@ int sync_dir (const struct Dir dir, const char *browsername) {
         return -1;
     }
 
-    if (dir.type == TYPE_PROFILE) {
-        if (move (dir.path, dir.dirname) == -1) {
-            LOG (LOG_ERROR, "failed moving directory to backups");
+    if (move (dir.path, dir.dirname) == -1) {
+        LOG (LOG_ERROR, "failed moving directory to backups");
 
-            remove_r (tmpfs_rlpath);
+        remove_r (tmpfs_rlpath);
 
-            free (tmpfs_rlpath);
-            return -1;
-        }
+        free (tmpfs_rlpath);
+        return -1;
     }
 
     if (symlink (tmpfs_rlpath, dir.path) == -1) {
@@ -1121,16 +1095,14 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
         return -1;
     }
 
-    if (dir.type == TYPE_PROFILE) {
-        if (EXISTS (dir.dirname)) {
-            if (remove_r (dir.dirname) == -1) {
-                LOG (LOG_ERROR, "failed removing backup");
-                free (tmpfs_path);
-                return -1;
-            }
-        } else {
-            LOG (LOG_WARN, "did not find backup copy of directory");
+    if (EXISTS (dir.dirname)) {
+        if (remove_r (dir.dirname) == -1) {
+            LOG (LOG_ERROR, "failed removing backup");
+            free (tmpfs_path);
+            return -1;
         }
+    } else {
+        LOG (LOG_WARN, "did not find backup copy of directory");
     }
 
     free (tmpfs_path);
@@ -1343,7 +1315,7 @@ int unmount_overlay (void) {
 
     if (remove_r (".bor-upper") == -1) return -1;
 
-    // do not remove if .bor-work is a symlink
+    // do not remove if workdir is a symlink
     if (lstat (".bor-work", &sb) == -1) return -1;
     if (S_ISLNK (sb.st_mode)) {
         LOG (LOG_ERROR, "work directory for overlay filsystem is a symlink");

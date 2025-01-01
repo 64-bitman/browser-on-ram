@@ -11,9 +11,9 @@ rm -rf config tmpfs share test-browser
 mkdir -p config/bor
 mkdir -p tmpfs/bor
 mkdir -p share/bor/scripts
-mkdir -p test-browser/{profile.one,cache.one,profile.two,cache.two}
+mkdir -p test-browser/{profile.one,cache.one}
 
-touch test-browser/{profile.one,cache.one,profile.two,cache.two}/data
+touch test-browser/{profile.one,cache.one}/data
 
 echo test-browser > config/bor/browsers.conf
 
@@ -22,8 +22,6 @@ root=$\(realpath $\(dirname $\(realpath \$0\)\)/../../../test-browser\)
 
 echo profile \$root/profile.one
 echo cache \$root/cache.one
-echo profile \$root/profile.two
-echo cache \$root/cache.two
 EOT
 
 cat <<EOT > config/bor/bor.conf
