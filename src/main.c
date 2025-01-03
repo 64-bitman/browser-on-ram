@@ -112,7 +112,6 @@ int overlay_exists (void);
 //       (so we don't have to set locks after syncing in case of overlayfs)
 
 int main (int argc, char **argv) {
-    errno = 0;
 
     // too lazy to handle setgid (no use anyways);
     if (getegid () != getgid ()) {
@@ -310,7 +309,6 @@ void help(void) {
 // clang-format on
 
 int status (void) {
-    errno = 0;
     struct stat sb;
 
     struct Browser *browsers = NULL;
@@ -409,7 +407,6 @@ int status (void) {
 
 // initialize required dirs and create browsers.conf template
 int init (void) {
-    errno = 0;
     struct passwd *pw = getpwuid (USERID);
 
     HOMEDIR = strdup (pw->pw_dir);
@@ -501,7 +498,6 @@ int init (void) {
 
 // read & initialize config file & config structure
 int init_config (void) {
-    errno = 0;
     struct stat sb;
 
     // defaults
@@ -566,7 +562,6 @@ int init_config (void) {
 
 // read browsers.conf and return array of structs for dirs to synchronize
 int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
-    errno = 0;
     if (chdir (CONFDIR) == -1) return -1;
     ;
 
@@ -906,17 +901,12 @@ int do_action (int action) {
             PERROR ();
             return -1;
         }
-
-        setlock_browsers (browsers, browsers_len, false);
-    } else if (action == 's') {
-        setlock_browsers (browsers, browsers_len, true);
     }
 
     return 0;
 }
 
 int recover (const char *path, const char *browsername) {
-    errno = 0;
     int err = 0;
     struct stat sb;
 
@@ -966,7 +956,6 @@ exit:
 }
 
 int sync_dir (const struct Dir dir, const char *browsername, int overlay) {
-    errno = 0;
     struct stat sb;
 
     LOG (LOG_INFO, "syncing directory %s", dir.path);
@@ -1089,7 +1078,6 @@ int sync_dir (const struct Dir dir, const char *browsername, int overlay) {
 }
 
 int unsync_dir (const struct Dir dir, const char *browsername) {
-    errno = 0;
     struct stat sb;
 
     LOG (LOG_INFO, "unsyncing directory %s", dir.path);
@@ -1150,7 +1138,6 @@ int resync_dir (const struct Dir dir, const char *browsername) {
         return 0;
     }
 
-    errno = 0;
     struct stat sb;
 
     LOG (LOG_INFO, "resyncing directory %s", dir.path);
@@ -1187,7 +1174,6 @@ int resync_dir (const struct Dir dir, const char *browsername) {
 }
 
 int clear_recovery (void) {
-    errno = 0;
 
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
@@ -1262,7 +1248,6 @@ int clear_recovery (void) {
 }
 
 int mount_overlay (void) {
-    errno = 0;
 
     if (!SETUID) {
         LOG (LOG_ERROR, "cannot mount overlay filesystem, program does not "
@@ -1314,7 +1299,6 @@ int mount_overlay (void) {
 }
 
 int unmount_overlay (void) {
-    errno = 0;
     struct stat sb;
 
     // check if overlay filesystem actually exists first
