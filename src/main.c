@@ -100,12 +100,11 @@ int clear_recovery (void);
 int mount_overlay (void);
 int unmount_overlay (void);
 int overlay_exists (void);
+int dir_is_rwx (const char *path);
 
-// TODO: remove browser directories in tmpfs and backup on full unsync
 // TODO: check if directories are read writable first
 // TODO: show size of overlay in status
 // TODO: add config option to toggle backups for cache dirs
-// on start)
 
 int main (int argc, char **argv) {
 
@@ -787,13 +786,16 @@ int do_action (int action) {
     for (size_t b = 0; b < browsers_len; b++) {
         struct Browser browser = browsers[b];
 
-        // create directories to store dirs for browser
-        if (chdir (CONFDIR_BACKUPSDIR) == -1) continue;
-        if (mkdir_p (browser.name, 0755) == -1) continue;
-        if (chdir (TMPFSDIR) == -1) continue;
-        if (mkdir_p (browser.name, 0755) == -1) continue;
-
         if (action == 's') {
+            // create directories to store dirs for browser
+            if (chdir (CONFDIR_BACKUPSDIR) == -1) continue;
+            if (mkdir_p (browser.name, 0755) == -1) continue;
+
+            if (!is_overlay) {
+                if (chdir (TMPFSDIR) == -1) continue;
+                if (mkdir_p (browser.name, 0755) == -1) continue;
+            }
+
             LOG (LOG_INFO, "syncing %s", browser.name);
         } else if (action == 'u') {
             LOG (LOG_INFO, "unsyncing %s", browser.name);
@@ -838,6 +840,16 @@ int do_action (int action) {
             LOG (LOG_INFO, "%s: no action done for any directory ",
                  browser.name);
         }
+
+        // delete browser directory if it is empty
+        if (action == 'u') {
+            if (chdir (CONFDIR_BACKUPSDIR) == 0) {
+                rmdir (browser.name);
+            }
+            if (chdir (TMPFSDIR) == 0 && !is_overlay) {
+                rmdir (browser.name);
+            }
+        }
     }
 
     // mount overlay filesystem
@@ -855,6 +867,13 @@ int do_action (int action) {
             LOG (LOG_ERROR, "could not unmount overlay");
             PERROR ();
             return -1;
+        }
+    }
+
+    // delete tmpfs directory
+    if (action == 'u') {
+        if (chdir (RUNTIMEDIR) == 0) {
+            rmdir ("bor");
         }
     }
 
