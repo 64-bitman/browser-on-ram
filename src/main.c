@@ -791,10 +791,8 @@ int do_action (int action) {
             if (chdir (CONFDIR_BACKUPSDIR) == -1) continue;
             if (mkdir_p (browser.name, 0755) == -1) continue;
 
-            if (!is_overlay) {
-                if (chdir (TMPFSDIR) == -1) continue;
-                if (mkdir_p (browser.name, 0755) == -1) continue;
-            }
+            if (chdir (TMPFSDIR) == -1) continue;
+            if (mkdir_p (browser.name, 0755) == -1) continue;
 
             LOG (LOG_INFO, "syncing %s", browser.name);
         } else if (action == 'u') {
@@ -1258,11 +1256,21 @@ int mount_overlay (void) {
     unsigned long flags = MS_NOATIME | MS_NODEV | MS_NOSUID;
 
     if (seteuid (0) == -1) return -1;
+
+    // check if directories have full perms
+    // overlay ignores permissions of lowerdir
+    if (!dir_is_rwx (CONFDIR_BACKUPSDIR) || !dir_is_rwx (".bor-upper") ||
+        !dir_is_rwx ("bor") || !dir_is_rwx (".bor-work")) {
+        return -1;
+    }
+
     if (mount ("overlay", TMPFSDIR, "overlay", flags, data) == -1) {
-        if (seteuid (USERID) == -1) return -1;
         LOG (LOG_ERROR, "failed mounting overlay filesystem");
-        remove_r (".bor-upper");
+
         remove_r (".bor-work");
+        if (seteuid (USERID) == -1) return -1;
+        remove_r (".bor-upper");
+
         return -1;
     }
     if (seteuid (USERID) == -1) return -1;
@@ -1292,14 +1300,14 @@ int unmount_overlay (void) {
     LOG (LOG_INFO, "umounting overlay filesystem");
 
     if (seteuid (0) == -1) return -1;
-    ;
-    if (umount2 (TMPFSDIR, UMOUNT_NOFOLLOW) == -1) {
+
+    // lazy unmount
+    if (umount2 (TMPFSDIR, UMOUNT_NOFOLLOW | MNT_DETACH) == -1) {
         if (seteuid (USERID) == -1) return -1;
         LOG (LOG_ERROR, "failed unmounting overlay filesystem");
         return -1;
     }
     if (seteuid (USERID) == -1) return -1;
-    ;
 
     if (chdir (RUNTIMEDIR) == -1) return -1;
 
@@ -1320,7 +1328,6 @@ int unmount_overlay (void) {
         return -1;
     }
     if (seteuid (USERID) == -1) return -1;
-    ;
 
     return 0;
 }
@@ -1347,6 +1354,54 @@ int overlay_exists (void) {
                         "runtime directory");
         return -1;
     }
+
+    return true;
+}
+
+// check if directory has full permissions by real uid of process
+int dir_is_rwx (const char *path) {
+    char *prevcwd = get_current_dir_name ();
+
+    if (prevcwd == NULL) return false;
+
+    // save euid to restore later
+    int err = 0;
+    uid_t euid = geteuid ();
+
+    if (seteuid (USERID) == -1) {
+        chdir (prevcwd);
+        return false;
+    }
+
+    // check if directory is rw via diropen() and opening a file in it
+    DIR *dirfp = opendir (path);
+
+    // assume errors as false
+    if (dirfp == NULL) err = true;
+    if (chdir (path) == -1) err = true;
+
+    int fd = creat (".test", 0644);
+
+    if (fd == -1) {
+        err = true;
+    } else {
+        close (fd);
+        unlink (".test");
+    }
+
+    if (dirfp != NULL) closedir (dirfp);
+
+    if (seteuid (euid) == -1) {
+        chdir (prevcwd);
+        return false;
+    }
+
+    if (err) {
+        LOG (LOG_WARN, "process does not have full permissions for %s", path);
+        chdir (prevcwd);
+        return false;
+    }
+    chdir (prevcwd);
 
     return true;
 }
