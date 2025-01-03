@@ -88,9 +88,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len);
 int init (void);
 int init_config (void);
 
-int setlock_dir (const struct Dir dir, int locked);
-void setlock_browsers (const struct Browser *browsers, size_t len, int locked);
-int lockexists_dir (const struct Dir dir);
+int dir_synced (struct Dir dir);
 int do_action (int action);
 int recover (const char *path, const char *browsername);
 
@@ -108,8 +106,6 @@ int overlay_exists (void);
 // TODO: show size of overlay in status
 // TODO: add config option to toggle backups for cache dirs
 // on start)
-// TODO: allow lock to exist in backup dirs too
-//       (so we don't have to set locks after syncing in case of overlayfs)
 
 int main (int argc, char **argv) {
 
@@ -738,67 +734,26 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
     return 0;
 }
 
-// create or unset lock in dir.path
-int setlock_dir (const struct Dir dir, int locked) {
-    errno = 0;
-    char *lockpath = print2string ("%s/.bor-lock", dir.path);
-
-    if (lockpath == NULL) return -1;
-
-    if (locked) {
-        int fd = creat (lockpath, O_RDONLY);
-        free (lockpath);
-
-        if (fd == -1) return -1;
-        fchmod (fd, 0444);
-        close (fd);
-    } else {
-        chmod (lockpath, 0666);
-        errno = 0;
-        if (unlink (lockpath) == -1 && errno != ENOENT) {
-            free (lockpath);
-            return -1;
-        }
-        free (lockpath);
-    }
-
-    return 0;
-}
-
-void setlock_browsers (const struct Browser *browsers, size_t len, int locked) {
-
-    for (size_t b = 0; b < len; b++) {
-        struct Browser browser = browsers[b];
-
-        for (size_t d = 0; d < browser.dirs_len; d++) {
-            struct Dir dir = browser.dirs[d];
-
-            if (setlock_dir (dir, locked) == -1) {
-                LOG (LOG_WARN, "failed setting/removing lock file for %s",
-                     dir.path);
-                PERROR ();
-            }
-        }
-    }
-}
-
-// return true or false if lock in dir.path exists
-int lockexists_dir (const struct Dir dir) {
+// check if directory is synced
+int dir_synced (struct Dir dir) {
+    // directory is synced if it is a symlink that points to a directory
     struct stat sb;
-    char *lockpath = print2string ("%s/.bor-lock", dir.path);
 
-    if (LEXISTS (lockpath)) {
-        free (lockpath);
-        return true;
-    } else {
-        free (lockpath);
+    // don't bother with errors, just assume false
+    if (lstat (dir.path, &sb) == -1) return false;
+
+    if (!S_ISLNK (sb.st_mode)) {
         return false;
     }
+
+    if (stat (dir.path, &sb) == -1 || !S_ISDIR (sb.st_mode)) {
+        return false;
+    }
+
+    return true;
 }
 
 int do_action (int action) {
-    errno = 0;
-
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
 
@@ -850,12 +805,12 @@ int do_action (int action) {
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
 
-            // sync only if lock doesn't exists and unsync/resync only if lock
-            // exists
-            if (action == 's' && lockexists_dir (dir)) {
+            if (action == 's' && dir_synced (dir)) {
+                LOG (LOG_DEBUG, "%s is already synced", dir.path);
                 continue;
             }
-            if ((action == 'u' || action == 'r') && !lockexists_dir (dir)) {
+            if ((action == 'u' || action == 'r') && !dir_synced (dir)) {
+                LOG (LOG_DEBUG, "%s is not synced", dir.path);
                 continue;
             }
 
@@ -1174,7 +1129,6 @@ int resync_dir (const struct Dir dir, const char *browsername) {
 }
 
 int clear_recovery (void) {
-
     struct Browser *browsers = NULL;
     size_t browsers_len = 0;
 
@@ -1248,7 +1202,6 @@ int clear_recovery (void) {
 }
 
 int mount_overlay (void) {
-
     if (!SETUID) {
         LOG (LOG_ERROR, "cannot mount overlay filesystem, program does not "
                         "have a setuid bit");
