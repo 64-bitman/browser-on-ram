@@ -58,6 +58,7 @@ struct Dir {
 
 struct Browser {
     char *name;
+    char procname[17];
     struct Dir *dirs;
     size_t dirs_len;
 };
@@ -80,7 +81,8 @@ static const struct option opts[] = {
     {"verbose", no_argument, NULL, 'v'},
     {"version", no_argument, NULL, 'V'},
     {"help", no_argument, NULL, 'h'},
-    {0, 0, 0, 0}};
+    {0, 0, 0, 0}
+};
 
 void help (void);
 int status (void);
@@ -102,8 +104,6 @@ int mount_overlay (void);
 int unmount_overlay (void);
 int overlay_exists (void);
 int dir_is_rwx (const char *path);
-
-// TODO: add proccess name of browser when reading browser shell scripts
 
 int main (int argc, char **argv) {
 
@@ -128,8 +128,8 @@ int main (int argc, char **argv) {
         };
     } else if (geteuid () != getuid ()) {
         // abort if setuid is set but it is not root
-        printf (
-            "program is not owned by root but has a setuid bit, aborting\n");
+        printf ("program is not owned by root but has a setuid bit, aborting\n"
+        );
         return 1;
     }
 
@@ -137,8 +137,8 @@ int main (int argc, char **argv) {
     int longindex;
     char action = 0;
 
-    while ((opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts,
-                               &longindex)) != -1) {
+    while ((opt = getopt_long (argc, argv, "surpxic:d:t:vVh", opts, &longindex)
+           ) != -1) {
         switch (opt) {
         case 's':
             action = 's';
@@ -230,10 +230,12 @@ int main (int argc, char **argv) {
         return 0;
     }
     if (SETUID == true) {
-        LOG (LOG_DEBUG,
-             "running as setuid program, real userid: %d | effective userid: "
-             "%d",
-             getuid (), geteuid ());
+        LOG (
+            LOG_DEBUG,
+            "running as setuid program, real userid: %d | effective userid: "
+            "%d",
+            getuid (), geteuid ()
+        );
     }
 
     if (init () == -1) {
@@ -352,8 +354,9 @@ int status (void) {
 
         printf ("%c%s:\n", toupper (browser.name[0]), browser.name + 1);
 
-        snprintf (bcrashdir, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR,
-                  browser.name);
+        snprintf (
+            bcrashdir, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR, browser.name
+        );
 
         DIR *dp = NULL;
         struct dirent *de = NULL;
@@ -373,13 +376,16 @@ int status (void) {
             if (dir_size != -1) {
                 printf ("%-20s%s\n", "Directory:", dir.path);
             } else {
-                printf ("%-20s%s%s\n", "Directory:", dir.path,
-                        "(DOES NOT EXIST!)");
+                printf (
+                    "%-20s%s%s\n", "Directory:", dir.path, "(DOES NOT EXIST!)"
+                );
             }
 
             // get tmpfs path
-            snprintf (buf, PATH_MAX + 1, "%s/%s/%s", TMPFSDIR, browser.name,
-                      dir.dirname);
+            snprintf (
+                buf, PATH_MAX + 1, "%s/%s/%s", TMPFSDIR, browser.name,
+                dir.dirname
+            );
 
             if (stat (buf, &sb) == 0) {
                 printf ("%-20s%s\n", "Tmpfs:", buf);
@@ -406,8 +412,9 @@ int status (void) {
                         if (strcmp (de->d_name, dir.dirname) != 0) continue;
 
                         *str_start = prevc;
-                        printf ("%-20s%s/%s\n", "Crash directory:", buf,
-                                de->d_name);
+                        printf (
+                            "%-20s%s/%s\n", "Crash directory:", buf, de->d_name
+                        );
                     }
                 }
                 rewinddir (dp);
@@ -502,8 +509,10 @@ int init (void) {
             return -1;
         }
 
-        fprintf (bcfp, "# each line corrosponds to a browser that should be "
-                       "synced, ex:\n");
+        fprintf (
+            bcfp, "# each line corrosponds to a browser that should be "
+                  "synced, ex:\n"
+        );
         fprintf (bcfp, "# firefox\n# chromium\n");
 
         fclose (bcfp);
@@ -635,8 +644,10 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
         char *filename = print2string ("%s.sh", browsername);
 
         if (!EXISTS (filename)) {
-            LOG (LOG_WARN, "script for %s does not exist, excluding browser",
-                 browsername);
+            LOG (
+                LOG_WARN, "script for %s does not exist, excluding browser",
+                browsername
+            );
             free (filename);
             continue;
         }
@@ -658,8 +669,10 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
         struct Browser browser = {
             .name = strdup (browsername),
+            .procname = {0},
             .dirs = calloc (MAX_DIRS, sizeof (*(browser.dirs))),
-            .dirs_len = 0};
+            .dirs_len = 0,
+        };
 
         if (browser.name == NULL || browser.dirs == NULL) {
             return -1;
@@ -667,24 +680,43 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
 
         LOG (LOG_DEBUG, "got browser %s", browser.name);
 
+        // only set proccess name once for each browser
+        int got_procname = false;
+
         // read from shell script output (directories to sync)
-        // format: <dirtype> <path>
+        // format: <procname> <dirtype> <path>
         while (getline (&buf, &buf_size, pp) != -1) {
             buf = trim (buf);
 
-            // set space between <dirtype> and <path> to NULL so we only see
-            // dirtype part
-            char *delim = strchr (buf, ' ');
+            char procname[17] = {0}, typestr[50] = {0};
+            char *path = calloc (PATH_MAX + 1, sizeof (*path));
 
-            if (delim == NULL) {
-                LOG (LOG_WARN, "no directory type provided");
+            if (path == NULL) return -1;
+
+            enum DirType type = TYPES_ERROR;
+
+            int nread = 0;
+            int sscanf_ret =
+                sscanf (buf, "%s %s %n", procname, typestr, &nread);
+
+            if (sscanf_ret != 2) {
+                LOG (
+                    LOG_WARN, "failed parsing shell script output \"%s\"", buf
+                );
+                LOG (LOG_INFO, "%d", sscanf_ret);
+                PERROR ();
                 continue;
             }
 
-            char *typestr = buf, *path = delim + 1;
-            enum DirType type = TYPES_ERROR;
+            // rest of buf is path
+            strncpy (path, buf + nread, PATH_MAX + 1);
 
-            *delim = 0;
+            if (!got_procname) {
+                got_procname = true;
+                LOG (LOG_DEBUG, "browser proccess name is \"%s\"", procname);
+
+                strncpy (browser.procname, procname, 17);
+            }
 
             // compare dir type to database of dir types
             for (int i = 1; i < TYPES_LEN; i++) {
@@ -693,9 +725,6 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
                     break;
                 }
             }
-
-            // note: if path has a space in it and there is no dir type
-            // then this will handle it
             if (type == TYPES_ERROR) {
                 LOG (LOG_WARN, "Unknown directory type '%'", typestr);
                 continue;
@@ -719,9 +748,11 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
                 if (exclude) continue;
             }
 
-            struct Dir dir = {.path = strdup (path),
-                              .dirname = strdup (basename (path)),
-                              .type = type};
+            struct Dir dir = {
+                .path = path, // already allocated memory
+                .dirname = strdup (basename (path)),
+                .type = type
+            };
 
             if (dir.path == NULL || dir.dirname == NULL) {
                 return -1;
@@ -788,7 +819,8 @@ int do_action (int action) {
     // check if browsers proccesses are running
     if (!IGNORE_CHECK && action == 's') {
         for (size_t i = 0; i < browsers_len; i++) {
-            if (pgrep (browsers[i].name) != -1) {
+            LOG (LOG_INFO, "%s", browsers[i].procname);
+            if (pgrep (browsers[i].procname) != -1) {
                 LOG (LOG_ERROR, "%s is running, aborting", browsers[i].name);
                 return -1;
             }
@@ -801,9 +833,11 @@ int do_action (int action) {
         if (SETUID) {
             is_overlay = true;
         } else {
-            LOG (LOG_WARN,
-                 "unable to mount overlay filesystem because setuid bit "
-                 "is not configured");
+            LOG (
+                LOG_WARN,
+                "unable to mount overlay filesystem because setuid bit "
+                "is not configured"
+            );
         }
     }
 
@@ -859,8 +893,9 @@ int do_action (int action) {
             count++;
         }
         if (count == 0) {
-            LOG (LOG_INFO, "%s: no action done for any directory ",
-                 browser.name);
+            LOG (
+                LOG_INFO, "%s: no action done for any directory ", browser.name
+            );
         }
 
         // delete browser directory if it is empty
@@ -1002,8 +1037,9 @@ int sync_dir (const struct Dir dir, const char *browsername, int overlay) {
                 return -1;
             }
         } else {
-            LOG (LOG_INFO,
-                 "directory doesn't exist, using backup copy instead");
+            LOG (
+                LOG_INFO, "directory doesn't exist, using backup copy instead"
+            );
 
             if (remove (dir.path) == -1) return -1;
             ;
@@ -1194,8 +1230,9 @@ int clear_recovery (void) {
             struct Dir dir = browser.dirs[d];
 
             // read crash directory folder for browser
-            snprintf (buf, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR,
-                      browser.name);
+            snprintf (
+                buf, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR, browser.name
+            );
             DIR *dp = opendir (buf);
 
             if (dp == NULL || chdir (buf) == -1) {
@@ -1225,8 +1262,9 @@ int clear_recovery (void) {
                     *str_start = prevc;
 
                     if (remove_r (de->d_name) == -1) {
-                        LOG (LOG_WARN, "failed removing %s/%s", buf,
-                             de->d_name);
+                        LOG (
+                            LOG_WARN, "failed removing %s/%s", buf, de->d_name
+                        );
                         continue;
                     } else {
                         LOG (LOG_INFO, "removing %s/%s", buf, de->d_name);
@@ -1244,8 +1282,10 @@ int clear_recovery (void) {
 
 int mount_overlay (void) {
     if (!SETUID) {
-        LOG (LOG_ERROR, "cannot mount overlay filesystem, program does not "
-                        "have a setuid bit");
+        LOG (
+            LOG_ERROR, "cannot mount overlay filesystem, program does not "
+                       "have a setuid bit"
+        );
         return -1;
     }
 
@@ -1274,9 +1314,9 @@ int mount_overlay (void) {
     if (mkdir_p (".bor-upper", 0755) == -1) return -1;
     if (mkdir_p (".bor-work", 0755) == -1) return -1;
 
-    const char *data =
-        print2string ("lowerdir=%s,upperdir=.bor-upper,workdir=.bor-work",
-                      CONFDIR_BACKUPSDIR);
+    const char *data = print2string (
+        "lowerdir=%s,upperdir=.bor-upper,workdir=.bor-work", CONFDIR_BACKUPSDIR
+    );
     unsigned long flags = MS_NOATIME | MS_NODEV | MS_NOSUID;
 
     if (seteuid (0) == -1) return -1;
@@ -1316,8 +1356,10 @@ int unmount_overlay (void) {
     }
 
     if (!SETUID) {
-        LOG (LOG_ERROR, "cannot unmount overlay filesystem, program does not "
-                        "have a setuid bit");
+        LOG (
+            LOG_ERROR, "cannot unmount overlay filesystem, program does not "
+                       "have a setuid bit"
+        );
         return -1;
     }
 
@@ -1374,8 +1416,10 @@ int overlay_exists (void) {
     if (statfs (TMPFSDIR, &fsb) == -1) return -1;
     // OVERLAYFS_SUPER_MAGIC
     if (fsb.f_type != 0x794c7630) {
-        LOG (LOG_ERROR, "tmpfs dir is on a different filesystem than the "
-                        "runtime directory");
+        LOG (
+            LOG_ERROR, "tmpfs dir is on a different filesystem than the "
+                       "runtime directory"
+        );
         return -1;
     }
 

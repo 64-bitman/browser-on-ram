@@ -20,8 +20,8 @@ echo test-browser > config/bor/browsers.conf
 cat <<EOT > share/bor/scripts/test-browser.sh
 root=$\(realpath $\(dirname $\(realpath \$0\)\)/../../../test-browser\)
 
-echo profile \$root/profile.one
-echo cache \$root/cache.one
+echo test profile \$root/profile.one
+echo test cache \$root/cache.one
 EOT
 
 cat <<EOT > config/bor/bor.conf
