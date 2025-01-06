@@ -64,6 +64,7 @@ struct Browser {
 
 struct Config {
     int enable_overlay;
+    int resync_cache;
 } CONFIG = {0};
 
 static const struct option opts[] = {
@@ -102,7 +103,6 @@ int unmount_overlay (void);
 int overlay_exists (void);
 int dir_is_rwx (const char *path);
 
-// TODO: check if directories are read writable first
 // TODO: show size of overlay in status
 // TODO: add config option to toggle backups for cache dirs
 
@@ -419,6 +419,8 @@ int init (void) {
             CONFDIR = print2string ("%s/bor", xdgconfighome);
         }
     }
+    if (CONFDIR == NULL) return -1;
+
     CONFDIR_BACKUPSDIR = print2string ("%s/backups", CONFDIR);
     CONFDIR_CRASHDIR = print2string ("%s/crash-reports", CONFDIR);
 
@@ -444,8 +446,7 @@ int init (void) {
         SCRIPTDIR = strdup (SHAREDIR "/bor/scripts");
     }
 
-    if (CONFDIR == NULL || CONFDIR_BACKUPSDIR == NULL || TMPFSDIR == NULL ||
-        SCRIPTDIR == NULL) {
+    if (CONFDIR_BACKUPSDIR == NULL || TMPFSDIR == NULL || SCRIPTDIR == NULL) {
         LOG (LOG_ERROR, "failed initializing directory paths");
         return -1;
     }
@@ -497,10 +498,9 @@ int init_config (void) {
 
     // defaults
     CONFIG.enable_overlay = false;
+    CONFIG.resync_cache = true;
 
-    // clang-tidy for some reason says CONFDIR can be NULL?
-    if (CONFDIR == NULL) return -1;
-
+    // NOLINTNEXTLINE
     if (chdir (CONFDIR) == -1) return -1;
 
     // don't read if config file doesnt exist
@@ -537,16 +537,20 @@ int init_config (void) {
         if (strcmp (key, "enable_overlay") == 0) {
             int boolean = get_bool (value);
 
-            if (boolean == -1) {
-                LOG (LOG_WARN, "invalid value for config option %s = %s", value,
-                     key);
-                continue;
-            }
+            if (boolean == -1) goto invalid;
             CONFIG.enable_overlay = boolean;
+        } else if (strcmp (key, "resync_cache") == 0) {
+            int boolean = get_bool (value);
+
+            if (boolean == -1) goto invalid;
+            CONFIG.resync_cache = boolean;
         } else {
             LOG (LOG_WARN, "unknown config option %s = %s", key, value);
         }
         LOG (LOG_DEBUG, "received config option %s = %s", key, value);
+        continue;
+    invalid:
+        LOG (LOG_WARN, "invalid value for config option %s = %s", value, key);
     }
 
     free (buf);
@@ -1105,7 +1109,7 @@ int unsync_dir (const struct Dir dir, const char *browsername) {
 }
 
 int resync_dir (const struct Dir dir, const char *browsername) {
-    if (dir.type == TYPE_CACHE) {
+    if (dir.type == TYPE_CACHE && !CONFIG.resync_cache) {
         LOG (LOG_DEBUG, "%s is cache, not resyncing", dir.path);
         return 0;
     }

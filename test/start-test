@@ -26,6 +26,7 @@ EOT
 
 cat <<EOT > config/bor/bor.conf
 enable_overlay = true
+resync_cache = true
 EOT
 
 sed -i -e 's/\\//g' share/bor/scripts/test-browser.sh
