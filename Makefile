@@ -1,4 +1,6 @@
-PREFIX := /usr/local
+ifndef MY_FLAG
+	PREFIX := /usr/local
+endif
 
 CC := gcc
 CFLAGS := -Wextra -Wall -Wshadow -std=gnu11 -DSHAREDIR=\"$(PREFIX)/share\"

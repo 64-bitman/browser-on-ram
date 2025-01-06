@@ -82,7 +82,9 @@ cd browser-on-ram
 make
 
 # NOTE: user installs are not supported
-sudo make install
+sudo RELEASE make install
+# install systemd files
+sudo make install-systemd
 
 # optional: enable overlay filesystem capability via setting setuid bit
 sudo make install_setuid
