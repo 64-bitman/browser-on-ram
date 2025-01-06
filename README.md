@@ -79,10 +79,11 @@ is not supported as of now.
 ```sh
 git clone https://github.com/64-bitman/browser-on-ram.git
 cd browser-on-ram
-make
+RELEASE=1 make
 
 # NOTE: user installs are not supported
-sudo RELEASE make install
+# optional: set PREFIX var to configure base directory
+sudo make install
 # install systemd files
 sudo make install-systemd
 
