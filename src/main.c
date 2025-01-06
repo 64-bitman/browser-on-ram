@@ -105,6 +105,9 @@ int unmount_overlay (void);
 int overlay_exists (void);
 int dir_is_rwx (const char *path);
 
+// TODO: allow shell expansion in exclude.conf
+// TODO: refactor to create one function that does the parsing stuff
+
 int main (int argc, char **argv) {
 
     // too lazy to handle setgid (no use anyways);
@@ -549,6 +552,9 @@ int init_config (void) {
     while (getline (&buf, &buf_size, conf_fp) != -1) {
         buf = trim (buf);
 
+        // ignore comments (#)
+        if (buf[0] == '#') continue;
+
         char *equal_sign = strchr (buf, '=');
 
         if (equal_sign == NULL) {
@@ -737,6 +743,8 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
                 // read through exclude.conf
                 while (getline (&ebuf, &ebuf_size, exclude_fp) != -1) {
                     ebuf = trim (ebuf);
+
+                    if (ebuf[0] == '#') continue;
                     if (strcmp (path, ebuf) == 0) {
                         exclude = true;
                         break;
@@ -819,7 +827,6 @@ int do_action (int action) {
     // check if browsers proccesses are running
     if (!IGNORE_CHECK && action == 's') {
         for (size_t i = 0; i < browsers_len; i++) {
-            LOG (LOG_INFO, "%s", browsers[i].procname);
             if (pgrep (browsers[i].procname) != -1) {
                 LOG (LOG_ERROR, "%s is running, aborting", browsers[i].name);
                 return -1;

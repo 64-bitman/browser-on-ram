@@ -25,6 +25,7 @@ echo test cache \$root/cache.one
 EOT
 
 cat <<EOT > config/bor/bor.conf
+# test
 enable_overlay = true
 resync_cache = true
 EOT
