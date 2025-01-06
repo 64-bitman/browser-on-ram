@@ -103,8 +103,7 @@ int unmount_overlay (void);
 int overlay_exists (void);
 int dir_is_rwx (const char *path);
 
-// TODO: show size of overlay in status
-// TODO: add config option to toggle backups for cache dirs
+// TODO: add proccess name of browser when reading browser shell scripts
 
 int main (int argc, char **argv) {
 
@@ -268,6 +267,7 @@ int main (int argc, char **argv) {
     if (action == 'p') {
         if (status () == -1) {
             LOG (LOG_ERROR, "status failed");
+            PERROR ();
             return 1;
         };
     }
@@ -276,6 +276,7 @@ int main (int argc, char **argv) {
     if (action == 'x') {
         if (clear_recovery () == -1) {
             LOG (LOG_ERROR, "failed clearing recovery directories");
+            PERROR ();
             return 1;
         }
     }
@@ -322,9 +323,25 @@ int status (void) {
     printf ("%-20s%s\n", "Systemd service:", srv_active);
     printf ("%-20s%s\n", "Systemd timer:", timer_active);
 
+    int overlay_active = overlay_exists ();
+
+    printf ("%-20s%s\n", "Overlay status:", overlay_active ? "true" : "false");
+
+    // show overlay size (physical data in tmpfs)
+    if (overlay_active) {
+        if (chdir (RUNTIMEDIR) == -1) return -1;
+
+        off_t size = get_dir_size (".bor-upper");
+
+        if (size != -1) {
+            char *human = human_readable (size);
+            printf ("%-20s%s\n", "Overlay size:", human);
+            free (human);
+        }
+    }
+
     printf ("\nConfigured directories\n\n");
 
-    // impletement status
     char *buf = calloc (PATH_MAX + 1, sizeof (*buf));
     char *bcrashdir = calloc (PATH_MAX + 1, sizeof (*bcrashdir));
 
@@ -338,10 +355,13 @@ int status (void) {
         snprintf (bcrashdir, PATH_MAX + 1, "%s/%s", CONFDIR_CRASHDIR,
                   browser.name);
 
-        DIR *dp = opendir (bcrashdir);
+        DIR *dp = NULL;
         struct dirent *de = NULL;
 
-        if (dp == NULL) return -1;
+        if (stat (bcrashdir, &sb) == 0) {
+            dp = opendir (bcrashdir);
+            if (dp == NULL) return -1;
+        }
 
         for (size_t d = 0; d < browser.dirs_len; d++) {
             struct Dir dir = browser.dirs[d];
@@ -353,7 +373,7 @@ int status (void) {
             if (dir_size != -1) {
                 printf ("%-20s%s\n", "Directory:", dir.path);
             } else {
-                printf ("%-20s%s %s\n", "Directory:", dir.path,
+                printf ("%-20s%s%s\n", "Directory:", dir.path,
                         "(DOES NOT EXIST!)");
             }
 
@@ -393,7 +413,7 @@ int status (void) {
                 rewinddir (dp);
             }
         }
-        closedir (dp);
+        if (dp != NULL) closedir (dp);
     }
     free (buf);
     free (bcrashdir);
