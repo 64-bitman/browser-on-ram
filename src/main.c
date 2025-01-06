@@ -715,7 +715,7 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
             }
 
             // rest of buf is path
-            strncpy (path, buf + nread, PATH_MAX + 1);
+            strncpy (path, buf + nread, PATH_MAX);
 
             if (!got_procname) {
                 got_procname = true;

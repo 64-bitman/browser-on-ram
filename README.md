@@ -79,6 +79,7 @@ is not supported as of now.
 ```sh
 git clone https://github.com/64-bitman/browser-on-ram.git
 cd browser-on-ram
+# exclude RELEASE if you want a debug build
 RELEASE=1 make
 
 # NOTE: user installs are not supported
