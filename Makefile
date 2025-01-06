@@ -50,9 +50,11 @@ $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 
 install:
 	install -dm 755 $(PREFIX)/share/bor/scripts
-	install -dm 755 $(PREFIX)/lib/systemd/user
 	install -Dm 755 $(BUILD_DIR)/bin/bor $(PREFIX)/bin/bor
 	install -Dm 644 scripts/browsers/*.sh $(PREFIX)/share/bor/scripts
+
+install-systemd:
+	install -dm 755 $(PREFIX)/lib/systemd/user
 	install -Dm 644 systemd/* $(PREFIX)/lib/systemd/user
 
 install_setuid:
