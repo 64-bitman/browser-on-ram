@@ -109,7 +109,7 @@ int dir_is_rwx (const char *path);
 // TODO: refactor to create one function that does the parsing stuff
 // add flatpak support?
 // config option to toggle cache dirs
-// refactor config options logic 
+// refactor config options logic
 
 int main (int argc, char **argv) {
 
@@ -712,7 +712,6 @@ int read_browsersconf (struct Browser **browsers, size_t *browsers_len) {
                 LOG (
                     LOG_WARN, "failed parsing shell script output \"%s\"", buf
                 );
-                LOG (LOG_INFO, "%d", sscanf_ret);
                 PERROR ();
                 continue;
             }
