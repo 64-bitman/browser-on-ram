@@ -3,7 +3,7 @@
 Syncs browser related directories such as your profile and cache to RAM via tmpfs.
 This results in increased performance and reduced disk writes. This is done by
 copying the directory to a tmpfs and creating a backup on disk that is regulary
-synced to via the systemd timer. Additionally using an overlay filesystem is
+synced to via the systemd timer. Additionally, using an overlay filesystem is
 supported, see [here](#overlay-filesystem).
 
 **!!! This is program is still fresh, and as such backups are advised;

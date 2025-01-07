@@ -107,6 +107,9 @@ int dir_is_rwx (const char *path);
 
 // TODO: allow shell expansion in exclude.conf
 // TODO: refactor to create one function that does the parsing stuff
+// add flatpak support?
+// config option to toggle cache dirs
+// refactor config options logic 
 
 int main (int argc, char **argv) {
 
