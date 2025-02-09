@@ -1,0 +1,563 @@
+#define _GNU_SOURCE
+#include "util.h"
+
+#include <dirent.h>
+#include <fcntl.h>
+#include <ftw.h>
+#include <libgen.h>
+#include <unistd.h>
+#include <wordexp.h>
+
+#include <ctype.h>
+#include <errno.h>
+#include <sys/capability.h>
+#include <limits.h>
+#include <stdarg.h>
+#include <stdbool.h>
+#include <stdio.h>
+#include <sys/sendfile.h>
+#include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
+#include <sys/types.h>
+#include <openssl/sha.h>
+
+enum LogLevel LOG_LEVEL = LOG_INFO;
+
+static const char *log_str[] = { "DEBUG", "INFO", "WARN", "ERROR" };
+
+void plog(enum LogLevel level, const char *format, ...)
+{
+        if (LOG_LEVEL > level) {
+                return;
+        }
+
+        va_list args;
+
+        va_start(args, format);
+
+        fprintf(stderr, "%5s: ", log_str[level]);
+        vfprintf(stderr, format, args);
+        fprintf(stderr, "\n");
+
+        va_end(args);
+}
+
+// essentially mkdir -p
+int create_dir(const char *path, mode_t mode)
+{
+        struct stat sb;
+        // chdir through each directory and
+        // create the next, then chdir onto that one
+        int err = 0;
+        char prev_cwd[PATH_MAX] = { 0 }, path_str[PATH_MAX] = { 0 };
+
+        snprintf(path_str, PATH_MAX, "%s", path);
+        if (getcwd(prev_cwd, PATH_MAX) == NULL) {
+                err = -1;
+                goto exit;
+        }
+
+        // chdir to root dir if absolute path
+        if (path_str[0] == '/') {
+                if (chdir("/") == -1) {
+                        err = -1;
+                        goto exit;
+                }
+        }
+
+        char *dir = strtok(path_str, "/");
+
+        while (dir != NULL) {
+                if (EXISTS(dir))
+                        goto finish_cycle;
+
+                if (mkdir(dir, mode) == -1) {
+                        err = -1;
+                        goto exit;
+                }
+
+finish_cycle:
+                if (chdir(dir) == -1) {
+                        err = -1;
+                        goto exit;
+                }
+                dir = strtok(NULL, "/");
+        }
+
+exit:
+        if (chdir(prev_cwd) == -1) {
+                return -1;
+        }
+        return err;
+}
+
+// find specified file/dir specified by path in given directories,
+// return malloc'd array of malloc'd strings of size count and length len
+// each string is an absolute path
+char **search_path(size_t *len, const char *path, size_t count, ...)
+{
+        struct stat sb;
+
+        int err = 0;
+        char prev_cwd[PATH_MAX] = { 0 };
+        char **array = calloc(count, sizeof(*array));
+        va_list args;
+
+        if (getcwd(prev_cwd, PATH_MAX) == NULL || array == NULL) {
+                free(array);
+                return NULL;
+        }
+
+        va_start(args, count);
+
+        char *current_dir = NULL;
+        (*len) = 0;
+
+        for (size_t i = 0; i < count; i++) {
+                current_dir = va_arg(args, char *);
+
+                if (!DIREXISTS(current_dir) || chdir(current_dir) == -1) {
+                        continue;
+                }
+
+                if (EXISTS(path)) {
+                        char *unexpanded = NULL;
+
+                        asprintf(&unexpanded, "%s/%s", current_dir, path);
+
+                        array[*len] = realpath(unexpanded, NULL);
+                        free(unexpanded);
+
+                        if (array[*len] == NULL) {
+                                err = -1;
+                                break;
+                        }
+                        (*len)++;
+                }
+
+                if (chdir(prev_cwd) == -1) {
+                        err = -1;
+                        break;
+                }
+        }
+        va_end(args);
+
+        if (chdir(prev_cwd) == -1) {
+                err = -1;
+        }
+        if (err == -1) {
+                free_str_array(array, *len);
+                free(array);
+                return NULL;
+        }
+        return array;
+}
+
+// free array of strings up to arr_len not including the array
+void free_str_array(char **arr, size_t arr_len)
+{
+        for (size_t i = 0; i < arr_len; i++) {
+                free(arr[i]);
+        }
+}
+
+// trim characters before and after the first or last non-whitespace chars
+// modifies string in place
+int trim(char *str)
+{
+        size_t start = 0, end = strlen(str) - 1;
+
+        while (start < strlen(str) && isspace(str[start])) {
+                start++;
+        }
+        while (end > start && isspace(str[end])) {
+                end--;
+        }
+        char *copy = strdup(str);
+        if (copy == NULL)
+                return -1;
+
+        snprintf(str, end - start + 2, "%s", copy + start);
+
+        free(copy);
+
+        return 0;
+}
+
+// copy directory using by forking off rsync
+// if include_root param is true then make dest the
+// parent directory of src when copying
+int copy_path(const char *src, const char *dest, bool include_root)
+{
+        if (file_has_bad_perms(src)) {
+                return -1;
+        }
+
+        char *cmdline = NULL;
+        char *template = NULL;
+        char *src_dup = strdup(src);
+
+        if (src_dup == NULL) {
+                return -1;
+        }
+
+        // remove trailing slash in src if there is one
+        if (src_dup[strlen(src_dup) - 1] == '/') {
+                src_dup[strlen(src_dup) - 1] = 0;
+        }
+        struct stat sb;
+        if (stat(src_dup, &sb) == -1) {
+                return -1;
+        }
+
+        // trailing clash indicates to only copy contents (only if directory)
+        if (!include_root && S_ISDIR(sb.st_mode)) {
+                template = "rsync -aAX  --no-whole-file --inplace '%s/' '%s'";
+        } else {
+                template = "rsync -aAX --no-whole-file --inplace '%s' '%s'";
+        }
+
+        if (asprintf(&cmdline, template, src_dup, dest) == -1) {
+                free(src_dup);
+                return -1;
+        }
+        free(src_dup);
+
+        FILE *cmdp = popen(cmdline, "r");
+
+        free(cmdline);
+
+        if (cmdp == NULL || pclose(cmdp) != 0) {
+                return -1;
+        }
+
+        return 0;
+}
+
+// handles fies/directories passed from nftw (3)
+static int remove_dir_handler(const char *fpath, const struct stat *UNUSED(sb),
+                              int typeflag, struct FTW *UNUSED(ftwbuf))
+{
+        if (typeflag == FTW_DP) {
+                if (rmdir(fpath) == -1) {
+                        return -1;
+                }
+                return 0;
+        } else if (typeflag == FTW_F || typeflag == FTW_SL ||
+                   typeflag == FTW_NS) {
+                // remove files
+
+                if (chmod(fpath, 0644) == -1 || unlink(fpath) == -1) {
+                        return -1;
+                }
+                return 0;
+        }
+        // anything else is error
+
+        return -1;
+}
+
+int remove_dir(const char *path)
+{
+        if (file_has_bad_perms(path)) {
+                return -1;
+        }
+
+        struct stat sb;
+
+        if (!DIREXISTS(path)) {
+                return -1;
+        }
+
+        if (nftw(path, remove_dir_handler, 512, FTW_DEPTH | FTW_PHYS) == -1) {
+                return -1;
+        }
+
+        return 0;
+}
+
+// move src to dest inplace via rename (2) if on same filesystem
+// else copy it to dest and remove src
+// include_root -> see copy_dir()
+int move_path(const char *src, const char *dest, bool include_root)
+{
+        if (file_has_bad_perms(src)) {
+                return -1;
+        }
+
+        char *dest_dup = NULL;
+
+        if (include_root) {
+                if (mkdir(dest, 0755) == -1 && errno != EEXIST) {
+                        return -1;
+                }
+
+                char *tmp = strdup(src);
+                asprintf(&dest_dup, "%s/%s", dest, basename(tmp));
+                free(tmp);
+        } else {
+                dest_dup = (char *)dest;
+        }
+
+        if (dest_dup == NULL) {
+                return -1;
+        }
+
+        // attempt to use rename(), if returns EXDEV errno then do copy method
+        errno = 0;
+        if (rename(src, dest_dup) == -1) {
+                if (errno == EXDEV) {
+                        if (copy_path(src, dest_dup, false) == -1 ||
+                            remove_dir(src) == -1)
+                                return -1;
+                        return 0;
+                }
+                return -1;
+        }
+
+        return 0;
+}
+
+// iterate over a number until there is a unused filename
+// in format of <path>-<number>
+// will null terminate buf and preserve errno
+void create_unique_path(char *buf, size_t buf_size, const char *path)
+{
+        int prev_errno = errno;
+        struct stat sb;
+
+        snprintf(buf, buf_size, "%s", path);
+
+        if (EXISTS(buf)) {
+                size_t i = 0;
+
+                while (EXISTS(buf)) {
+                        i++;
+                        snprintf(buf, PATH_MAX, "%s-%ld", path, i);
+                }
+        }
+        errno = prev_errno;
+}
+
+// return true if file/dir is not owned by user and is unreadable or unexecutable
+bool file_has_bad_perms(const char *path)
+{
+        struct stat sb;
+
+        if (stat(path, &sb) == -1) {
+                return true;
+        } else {
+                if (sb.st_uid != getuid() && (sb.st_mode & 0777) < 0755) {
+                        return true;
+                }
+        }
+        return false;
+}
+
+// set the state of given capabiltiies in set and exit program on failure
+void set_caps(cap_flag_t set, cap_flag_value_t state, size_t count, ...)
+{
+        cap_value_t caps[cap_max_bits()];
+        cap_value_t current_cap;
+        va_list args;
+
+        va_start(args, count);
+
+        for (size_t i = 0; i < 100 && i < count; i++) {
+                current_cap = va_arg(args, cap_value_t);
+
+                caps[i] = current_cap;
+        }
+
+        va_end(args);
+
+        cap_t caps_state = cap_get_proc();
+
+        if (caps_state == NULL) {
+                goto error;
+        }
+
+        if (cap_set_flag(caps_state, set, (int)count, caps, state) == -1) {
+                goto error;
+        }
+        if (cap_set_proc(caps_state) == -1) {
+                goto error;
+        }
+
+        cap_free(caps_state);
+        return;
+error:
+        perror("failed setting capability");
+        exit(1);
+}
+
+// return true if specified capabilities are in state in given set
+// exit program on failure
+bool check_caps_state(cap_flag_t set, cap_flag_value_t state, size_t count, ...)
+{
+        cap_t caps_state = cap_get_proc();
+
+        if (caps_state == NULL) {
+                goto error;
+        }
+
+        va_list args;
+        cap_flag_value_t cstate;
+        cap_value_t current_cap;
+        bool bad = false;
+
+        va_start(args, count);
+
+        for (size_t i = 0; i < count; i++) {
+                current_cap = va_arg(args, cap_value_t);
+
+                if (!CAP_IS_SUPPORTED(current_cap)) {
+                        bad = true;
+                        break;
+                }
+
+                if (cap_get_flag(caps_state, current_cap, set, &cstate) == -1) {
+                        goto error;
+                }
+                if (cstate != state) {
+                        bad = true;
+                        break;
+                }
+        }
+
+        va_end(args);
+        cap_free(caps_state);
+
+        return (bad) ? false : true;
+error:
+        perror("failed checking capabilities");
+        exit(1);
+}
+
+// check if systemd user unit is active
+bool sd_uunit_active(const char *name)
+{
+        char *cmd = NULL;
+
+        asprintf(&cmd, "systemctl --user --quiet is-active '%s'", name);
+
+        if (cmd == NULL) {
+                return false;
+        }
+
+        int status = system(cmd);
+        free(cmd);
+
+        if (status == 0) {
+                return true;
+        }
+
+        return false;
+}
+
+// returns pid if name is found, else return -1
+pid_t get_pid(const char *name)
+{
+        DIR *dp = opendir("/proc");
+        struct dirent *ent;
+
+        if (dp == NULL) {
+                return -1;
+        }
+        char *exepath = calloc(PATH_MAX, sizeof(*exepath));
+        char *rlpath = calloc(PATH_MAX, sizeof(*exepath));
+
+        if (exepath == NULL || rlpath == NULL) {
+                free(exepath);
+                free(rlpath);
+                closedir(dp);
+                return -1;
+        }
+
+        while ((ent = readdir(dp)) != NULL) {
+                long lpid = atol(ent->d_name);
+
+                snprintf(exepath, PATH_MAX, "/proc/%ld/exe", lpid);
+                realpath(exepath, rlpath);
+
+                if (rlpath != NULL) {
+                        if (strcmp(basename(rlpath), name) == 0) {
+                                free(exepath);
+                                free(rlpath);
+                                closedir(dp);
+                                return (pid_t)lpid;
+                        }
+                }
+        }
+
+        free(exepath);
+        free(rlpath);
+        closedir(dp);
+        return -1;
+}
+
+static off_t dir_size = 0;
+
+static int get_dir_size_handler(const char *UNUSED(fpath),
+                                const struct stat *sb, int typeflag,
+                                struct FTW *UNUSED(ftwbuf))
+{
+        if (typeflag == FTW_F) {
+                dir_size += sb->st_size;
+        }
+        return 0;
+}
+
+// get dir size in bytes
+off_t get_dir_size(const char *path)
+{
+        dir_size = 0;
+
+        if (nftw(path, get_dir_size_handler, 512, 0) == -1) {
+                return -1;
+        }
+
+        return dir_size;
+}
+
+// convert size in bytes to malloc'd string in human readable format
+char *human_readable(off_t bytes)
+{
+        char *suffix[] = { "B", "KB", "MB", "GB", "TB" };
+        char length = sizeof(suffix) / sizeof(suffix[0]);
+
+        int i = 0;
+        double dblBytes = (double)bytes;
+
+        if (bytes > 1024) {
+                for (i = 0; (bytes / 1024) > 0 && i < length - 1;
+                     i++, bytes /= 1024)
+                        dblBytes = (double)bytes / 1024.0;
+        }
+
+        char *str = NULL;
+        asprintf(&str, "%.4g %s", dblBytes, suffix[i]);
+
+        return str;
+}
+
+// convert data into malloc'd string represented in hexadecimal
+char *get_sha1(const char *data)
+{
+        unsigned char hash[SHA_DIGEST_LENGTH];
+
+        SHA1((unsigned char *)data, strlen(data), hash);
+        char *out = calloc(61, sizeof(*out));
+
+        if (out == NULL) {
+                return NULL;
+        }
+
+        for (size_t i = 0; i < 20; i++) {
+                snprintf(out + i * 2, 4, "%02x", hash[i]);
+        }
+        return out;
+}
+
+// vim: sw=8 ts=8

@@ -1,0 +1,40 @@
+#!/bin/sh
+
+cd "$(pwd)/test"
+
+rm -rf config runtime cache data
+
+mkdir -p config/bor/scripts runtime cache/test-browser/subdir data/test-browser/subdir
+
+export XDG_CONFIG_HOME=$(realpath config)
+export XDG_RUNTIME_DIR=$(realpath runtime)
+
+cat << EOT >> config/bor/bor.conf
+[config]
+enable_cache = true
+enable_overlay = true
+
+[browsers]
+test-browser
+EOT
+
+cat << EOT >> config/bor/scripts/test-browser.sh
+echo "procname = test-browser"
+echo "profile = $(realpath 'data/test-browser')"
+echo "cache = $(realpath 'cache/test-browser')"
+EOT
+
+touch data/test-browser/{data1,data2,subdir/data3}
+touch cache/test-browser/{cache1,cache2,subdir/cache3}
+
+echo -e "\nSYNC\n"
+../build/debug/bin/bor --verbose --sync
+../build/debug/bin/bor --verbose --sync
+
+echo -e "\nRESYNC\n"
+
+../build/debug/bin/bor --verbose --resync
+
+echo -e "\nUNSYNC\n"
+
+../build/debug/bin/bor --verbose --unsync

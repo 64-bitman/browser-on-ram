@@ -1,0 +1,12 @@
+build/
+test/*
+!test/start_test
+*.vim
+vgcore.*
+.*
+!.gitignore
+!.clang-format
+!.clang-tidy
+!.clangd
+!.pre-commit-config.yaml
+compile_commands.json
