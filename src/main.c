@@ -18,6 +18,8 @@
 
 int do_action(enum Action action);
 int init(void);
+void print_help(void);
+void print_status(void);
 
 int main(int argc, char **argv)
 {
@@ -43,6 +45,7 @@ int main(int argc, char **argv)
                         printf("browser-on-ram version " VERSION "\n");
                         return 0;
                 case 'h':
+                        print_help();
                         return 0;
                 case 's':
                         action = ACTION_SYNC;
@@ -54,7 +57,7 @@ int main(int argc, char **argv)
                         action = ACTION_RESYNC;
                         break;
                 case 'p':
-                        action = ACTION_STATUS;
+                        print_status();
                         break;
                 default:
                         return 0;
@@ -102,6 +105,13 @@ int do_action(enum Action action)
                 }
         }
 
+        // cleanup directories
+        if (action == ACTION_UNSYNC) {
+                if (rmdir(PATHS.tmpfs)) {
+                        plog(LOG_WARN, "failed removing %s", PATHS.tmpfs);
+                }
+        }
+
         return 0;
 }
 
@@ -125,6 +135,14 @@ int init(void)
         }
 
         return 0;
+}
+
+void print_help(void)
+{
+}
+
+void print_status(void)
+{
 }
 
 // vim: sw=8 ts=8
