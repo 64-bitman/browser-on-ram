@@ -16,7 +16,7 @@
 #define VERSION "UNKNOWN"
 #endif
 
-int do_action(char action);
+int do_action(enum Action action);
 int init(void);
 
 int main(int argc, char **argv)
@@ -31,7 +31,7 @@ int main(int argc, char **argv)
                                          { NULL, 0, NULL, 0 } };
 
         int opt, opt_index;
-        char action = 0;
+        enum Action action = ACTION_NONE;
 
         while ((opt = getopt_long(argc, argv, "Vvhsurp", long_options,
                                   &opt_index)) != -1) {
@@ -45,16 +45,16 @@ int main(int argc, char **argv)
                 case 'h':
                         return 0;
                 case 's':
-                        action = 's';
+                        action = ACTION_SYNC;
                         break;
                 case 'u':
-                        action = 'u';
+                        action = ACTION_UNSYNC;
                         break;
                 case 'r':
-                        action = 'r';
+                        action = ACTION_RESYNC;
                         break;
                 case 'p':
-                        action = 'p';
+                        action = ACTION_STATUS;
                         break;
                 default:
                         return 0;
@@ -72,9 +72,10 @@ int main(int argc, char **argv)
 }
 
 // loop through configured browsers and do sync/unsync/resync on them
-int do_action(char action)
+int do_action(enum Action action)
 {
-        if (action != 's' && action != 'r' && action != 'u') {
+        if (action != ACTION_SYNC && action != ACTION_UNSYNC &&
+            action != ACTION_RESYNC) {
                 return 0;
         }
 
@@ -87,19 +88,17 @@ int do_action(char action)
                 struct Browser *browser = CONFIG.browsers[i];
 
                 // don't sync if browser is running
-                if (get_pid(browser->procname) != -1 && action == 's') {
+                if (get_pid(browser->procname) != -1 && action == ACTION_SYNC) {
                         plog(LOG_WARN, "%s is running, skipping",
                              browser->name);
                         continue;
                 }
-                // if a directory or entire browser was not synced (error)
-                // then skip it and still continue sync
-                if (action == 's') {
-                        if (sync_browser(browser) == -1) {
-                                plog(LOG_WARN, "failed syncing browser %s",
-                                     browser->name);
-                                continue;
-                        }
+                // if a directory or entire browser was not u/r/synced (error)
+                // then skip it and still continue
+                if (do_action_on_browser(browser, action) == -1) {
+                        plog(LOG_WARN, "failed %sing browser %s",
+                             action_str[action], browser->name);
+                        continue;
                 }
         }
 

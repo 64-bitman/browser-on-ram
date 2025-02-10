@@ -29,7 +29,6 @@ touch cache/test-browser/{cache1,cache2,subdir/cache3}
 
 echo -e "\nSYNC\n"
 ../build/debug/bin/bor --verbose --sync
-../build/debug/bin/bor --verbose --sync
 
 echo -e "\nRESYNC\n"
 

@@ -16,26 +16,33 @@
 
 static int sync_dir(struct Dir *dir);
 static int do_sync_dir(struct Dir *dir, char *backup, char *tmpfs);
+static int unsync_dir(struct Dir *dir);
 
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs);
 static int fix_session(struct Dir *dir, char *backup, char *tmpfs);
 static int fix_backup(char *backup, char *tmpfs);
 static int fix_tmpfs(char *backup, char *tmpfs);
-static int recover_path(struct Dir *syncdir, const char *path);
 
+static int recover_path(struct Dir *syncdir, const char *path);
 static int get_paths(struct Dir *dir, char *backup, char *tmpfs);
 
-int sync_browser(struct Browser *browser)
+// perform action on directories of browser
+int do_action_on_browser(struct Browser *browser, enum Action action)
 {
-        plog(LOG_INFO, "syncing browser %s", browser->name);
+        plog(LOG_INFO, "%sing browser %s", action_str[action], browser->name);
 
         for (size_t i = 0; i < browser->dirs_num; i++) {
                 struct Dir *dir = browser->dirs[i];
+                int err = 0;
 
-                if (sync_dir(dir) == -1) {
-                        plog(LOG_WARN, "failed syncing directory %s",
-                             dir->path);
-                        continue;
+                if (action == ACTION_SYNC && sync_dir(dir) == -1) {
+                        err = -1;
+                } else if (action == ACTION_UNSYNC && unsync_dir(dir) == -1) {
+                        err = -1;
+                }
+                if (err == -1) {
+                        plog(LOG_WARN, "failed %sing directory %s",
+                             action_str[action], dir->path);
                 }
         }
 
@@ -59,7 +66,7 @@ static int sync_dir(struct Dir *dir)
                 return -1;
         }
 
-        // repair state if previous sync session is corrupted
+        // attempt to repair state if previous sync session is corrupted
         if (repair_state(dir, backup_path, tmpfs_path) == -1) {
                 plog(LOG_ERROR,
                      "failed checking state of previous sync session");
@@ -104,6 +111,12 @@ static int do_sync_dir(struct Dir *dir, char *backup, char *tmpfs)
                 if (symlink(tmpfs, dir->path) == -1) {
                         plog(LOG_ERROR, "failed creating symlink");
                         PERROR();
+
+                        // move backup back
+                        if (move_path(backup, dir->path, false) == -1) {
+                                plog(LOG_WARN, "failed moving backup back");
+                                PERROR();
+                        }
                         return -1;
                 }
                 did_something = true;
@@ -112,6 +125,13 @@ static int do_sync_dir(struct Dir *dir, char *backup, char *tmpfs)
         if (!did_something) {
                 plog(LOG_INFO, "no sync action was performed");
         }
+        return 0;
+}
+
+static int unsync_dir(struct Dir *dir)
+{
+        plog(LOG_INFO, "unsyncing directory %s", dir->path);
+
         return 0;
 }
 
