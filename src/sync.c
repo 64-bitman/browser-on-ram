@@ -16,6 +16,7 @@
 
 static int sync_dir(struct Dir *dir, char *backup, char *tmpfs);
 static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs);
+static int resync_dir(struct Dir *dir, char *backup, char *tmpfs);
 
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs);
 static int fix_session(struct Dir *dir, char *backup, char *tmpfs);
@@ -39,7 +40,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action)
 
                 // find required paths
                 if (get_paths(dir, backup, tmpfs) == -1) {
-                        plog(LOG_ERROR, "failed getting required paths for %s",
+                        plog(LOG_WARN, "failed getting required paths for %s",
                              dir->path);
                         continue;
                 }
@@ -47,19 +48,19 @@ int do_action_on_browser(struct Browser *browser, enum Action action)
                 // attempt to repair state if previous/current
                 // sync session is corrupted
                 if (repair_state(dir, backup, tmpfs) == -1) {
-                        plog(LOG_ERROR,
+                        plog(LOG_WARN,
                              "failed checking state of previous sync session for %s",
                              dir->path);
                         continue;
                 }
 
                 // perform action
-                if (action == ACTION_SYNC &&
-                    sync_dir(dir, backup, tmpfs) == -1) {
-                        err = -1;
-                } else if (action == ACTION_UNSYNC &&
-                           unsync_dir(dir, backup, tmpfs) == -1) {
-                        err = -1;
+                if (action == ACTION_SYNC) {
+                        err = sync_dir(dir, backup, tmpfs);
+                } else if (action == ACTION_UNSYNC) {
+                        err = unsync_dir(dir, backup, tmpfs);
+                } else if (action == ACTION_RESYNC) {
+                        err = resync_dir(dir, backup, tmpfs);
                 }
                 if (err == -1) {
                         plog(LOG_WARN, "failed %sing directory %s",
@@ -124,12 +125,60 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs)
         return 0;
 }
 
+// does not perform resync, must be done before
 static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
 {
         struct stat sb;
         plog(LOG_INFO, "unsyncing directory %s", dir->path);
 
-        if (DIREXISTS(dir->path)) {
+        if (SYMEXISTS(dir->path)) {
+                if (unlink(dir->path) == -1) {
+                        plog(LOG_ERROR, "failed removing symlink");
+                        PERROR();
+                        return -1;
+                }
+        } else if (LEXISTS(dir->path)) {
+                // not a symlink
+                plog(LOG_ERROR, "dir is not a symlink");
+                return -1;
+        }
+        if (DIREXISTS(tmpfs)) {
+                if (move_path(tmpfs, dir->path, false) == -1) {
+                        plog(LOG_ERROR,
+                             "failed moving tmpfs back to symlink location");
+                        PERROR();
+                        return -1;
+                }
+        }
+        if (DIREXISTS(backup)) {
+                if (remove_dir(backup) == -1) {
+                        plog(LOG_ERROR, "failed removing backup");
+                        PERROR();
+                        return -1;
+                }
+        }
+
+        return 0;
+}
+
+static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
+{
+        struct stat sb;
+
+        plog(LOG_INFO, "resyncing directory %s", dir->path);
+        if (!DIREXISTS(tmpfs)) {
+                plog(LOG_ERROR, "tmpfs does not exist");
+                return -1;
+        }
+        // check if backup exists but not a directory
+        if (!DIREXISTS(backup) && LEXISTS(backup)) {
+                plog(LOG_ERROR, "backup is not a directory");
+                return -1;
+        }
+        if (copy_path(tmpfs, backup, false) == -1) {
+                plog(LOG_ERROR, "failed syncing backup with tmpfs");
+                PERROR();
+                return -1;
         }
 
         return 0;
