@@ -92,7 +92,7 @@ int init_config(void)
         CONFIG.enable_cache = false;
         CONFIG.resync_cache = true;
 
-        char prev_cwd[PATH_MAX] = { 0 };
+        char prev_cwd[PATH_MAX];
 
         if (getcwd(prev_cwd, PATH_MAX) == NULL || chdir(PATHS.config) == -1) {
                 PERROR();

@@ -30,8 +30,8 @@ int do_action_on_browser(struct Browser *browser, enum Action action)
 {
         plog(LOG_INFO, "%sing browser %s", action_str[action], browser->name);
 
-        char backup[PATH_MAX] = { 0 };
-        char tmpfs[PATH_MAX] = { 0 };
+        char backup[PATH_MAX];
+        char tmpfs[PATH_MAX];
 
         for (size_t i = 0; i < browser->dirs_num; i++) {
                 struct Dir *dir = browser->dirs[i];
@@ -338,7 +338,7 @@ static int recover_path(struct Dir *sync_dir, const char *path)
         }
 
         char *recovery_path = NULL;
-        char time_buf[100] = { 0 };
+        char time_buf[100];
 
         if (strftime(time_buf, 100, "%d-%m-%y_%H:%M:%S", time_info) == 0) {
                 asprintf(&recovery_path, "%s/%s_%s", parent_dir, time_buf,
@@ -354,7 +354,7 @@ static int recover_path(struct Dir *sync_dir, const char *path)
                 return -1;
         }
 
-        char unique_path[PATH_MAX] = { 0 };
+        char unique_path[PATH_MAX];
 
         create_unique_path(unique_path, PATH_MAX, recovery_path);
         free(recovery_path);

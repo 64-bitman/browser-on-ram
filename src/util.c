@@ -47,7 +47,7 @@ int create_dir(const char *path, mode_t mode)
         // chdir through each directory and
         // create the next, then chdir onto that one
         int err = 0;
-        char prev_cwd[PATH_MAX] = { 0 }, path_str[PATH_MAX] = { 0 };
+        char prev_cwd[PATH_MAX], path_str[PATH_MAX];
 
         snprintf(path_str, PATH_MAX, "%s", path);
         if (getcwd(prev_cwd, PATH_MAX) == NULL) {
@@ -97,7 +97,7 @@ char **search_path(size_t *len, const char *path, size_t count, ...)
         struct stat sb;
 
         int err = 0;
-        char prev_cwd[PATH_MAX] = { 0 };
+        char prev_cwd[PATH_MAX];
         char **array = malloc(count * sizeof(*array));
         va_list args;
 

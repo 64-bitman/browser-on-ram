@@ -31,7 +31,7 @@
 
 #define LOGCWD()                                       \
         do {                                           \
-                char logcwd_cwd[PATH_MAX] = { 0 };     \
+                char logcwd_cwd[PATH_MAX];             \
                 getcwd(logcwd_cwd, PATH_MAX);          \
                 plog(LOG_INFO, "CWD: %s", logcwd_cwd); \
         } while (0)
