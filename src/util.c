@@ -98,7 +98,7 @@ char **search_path(size_t *len, const char *path, size_t count, ...)
 
         int err = 0;
         char prev_cwd[PATH_MAX] = { 0 };
-        char **array = calloc(count, sizeof(*array));
+        char **array = malloc(count * sizeof(*array));
         va_list args;
 
         if (getcwd(prev_cwd, PATH_MAX) == NULL || array == NULL) {
@@ -462,34 +462,22 @@ pid_t get_pid(const char *name)
         if (dp == NULL) {
                 return -1;
         }
-        char *exepath = calloc(PATH_MAX, sizeof(*exepath));
-        char *rlpath = calloc(PATH_MAX, sizeof(*exepath));
-
-        if (exepath == NULL || rlpath == NULL) {
-                free(exepath);
-                free(rlpath);
-                closedir(dp);
-                return -1;
-        }
+        char exepath[PATH_MAX];
+        char rlpath[PATH_MAX];
 
         while ((ent = readdir(dp)) != NULL) {
                 long lpid = atol(ent->d_name);
 
                 snprintf(exepath, PATH_MAX, "/proc/%ld/exe", lpid);
-                realpath(exepath, rlpath);
 
-                if (rlpath != NULL) {
+                if (realpath(exepath, rlpath) != NULL) {
                         if (strcmp(basename(rlpath), name) == 0) {
-                                free(exepath);
-                                free(rlpath);
                                 closedir(dp);
                                 return (pid_t)lpid;
                         }
                 }
         }
 
-        free(exepath);
-        free(rlpath);
         closedir(dp);
         return -1;
 }

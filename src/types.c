@@ -14,47 +14,37 @@ struct Dir *new_dir(const char *path, enum DirType type,
 {
         struct stat sb;
 
-        struct Dir *new = calloc(1, sizeof(*new));
+        char buf[PATH_MAX], rlpath[PATH_MAX];
+        char *bn = NULL, *parent_dir = NULL;
 
-        char *tmp = strdup(path), *tmp2 = strdup(path);
-        char *bn = basename(tmp2);
-        char *parent_dir = dirname(tmp);
+        snprintf(buf, PATH_MAX, "%s", path);
+        bn = basename(buf);
+        snprintf(buf, PATH_MAX, "%s", path);
+        parent_dir = dirname(buf);
+
         // only expand path excluding basename
-        char *rlpath = realpath(parent_dir, NULL);
-
-        if (rlpath != NULL && !DIREXISTS(rlpath)) {
-                plog(LOG_ERROR, "'%s' does not exist", rlpath);
+        if (realpath(parent_dir, rlpath) == NULL || !DIREXISTS(rlpath)) {
+                plog(LOG_ERROR, "'%s' does not exist or is not a directory",
+                     rlpath);
                 return NULL;
         }
-
-        if (new == NULL || tmp == NULL || tmp2 == NULL || rlpath == NULL) {
-                PERROR();
-                free(new);
-                free(tmp);
-                free(tmp2);
-                free(rlpath);
-                return NULL;
-        }
-
-        snprintf(new->path, PATH_MAX, "%s/%s", rlpath, bn);
-        free(tmp);
-        free(rlpath);
-
-        new->type = type;
-        new->browser = browser;
 
         if (STR_EQUAL(bn, ".")) {
                 plog(LOG_ERROR,
                      "basename returned '.' when creating dir struct");
-                free(new);
-                free(tmp2);
+                return NULL;
+        }
+        struct Dir *new = malloc(sizeof(*new));
+
+        if (new == NULL) {
                 PERROR();
                 return NULL;
         }
+        new->type = type;
+        new->browser = browser;
 
+        snprintf(new->path, PATH_MAX, "%s/%s", rlpath, bn);
         snprintf(new->dirname, NAME_MAX, "%s", bn);
-
-        free(tmp2);
 
         return new;
 }
