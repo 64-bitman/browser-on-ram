@@ -14,9 +14,8 @@
 #include <dirent.h>
 #include <stdbool.h>
 
-static int sync_dir(struct Dir *dir);
-static int do_sync_dir(struct Dir *dir, char *backup, char *tmpfs);
-static int unsync_dir(struct Dir *dir);
+static int sync_dir(struct Dir *dir, char *backup, char *tmpfs);
+static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs);
 
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs);
 static int fix_session(struct Dir *dir, char *backup, char *tmpfs);
@@ -31,13 +30,35 @@ int do_action_on_browser(struct Browser *browser, enum Action action)
 {
         plog(LOG_INFO, "%sing browser %s", action_str[action], browser->name);
 
+        char backup[PATH_MAX] = { 0 };
+        char tmpfs[PATH_MAX] = { 0 };
+
         for (size_t i = 0; i < browser->dirs_num; i++) {
                 struct Dir *dir = browser->dirs[i];
                 int err = 0;
 
-                if (action == ACTION_SYNC && sync_dir(dir) == -1) {
+                // find required paths
+                if (get_paths(dir, backup, tmpfs) == -1) {
+                        plog(LOG_ERROR, "failed getting required paths for %s",
+                             dir->path);
+                        continue;
+                }
+
+                // attempt to repair state if previous/current
+                // sync session is corrupted
+                if (repair_state(dir, backup, tmpfs) == -1) {
+                        plog(LOG_ERROR,
+                             "failed checking state of previous sync session for %s",
+                             dir->path);
+                        continue;
+                }
+
+                // perform action
+                if (action == ACTION_SYNC &&
+                    sync_dir(dir, backup, tmpfs) == -1) {
                         err = -1;
-                } else if (action == ACTION_UNSYNC && unsync_dir(dir) == -1) {
+                } else if (action == ACTION_UNSYNC &&
+                           unsync_dir(dir, backup, tmpfs) == -1) {
                         err = -1;
                 }
                 if (err == -1) {
@@ -49,42 +70,16 @@ int do_action_on_browser(struct Browser *browser, enum Action action)
         return 0;
 }
 
-static int sync_dir(struct Dir *dir)
+static int sync_dir(struct Dir *dir, char *backup, char *tmpfs)
 {
         // don't sync if cache dirs not enabled
         if (!CONFIG.enable_cache && dir->type == DIR_CACHE) {
                 return 0;
         }
-
-        plog(LOG_INFO, "syncing directory %s", dir->path);
-
-        char backup_path[PATH_MAX] = { 0 };
-        char tmpfs_path[PATH_MAX] = { 0 };
-
-        if (get_paths(dir, backup_path, tmpfs_path) == -1) {
-                plog(LOG_ERROR, "failed creating required paths for dir");
-                return -1;
-        }
-
-        // attempt to repair state if previous sync session is corrupted
-        if (repair_state(dir, backup_path, tmpfs_path) == -1) {
-                plog(LOG_ERROR,
-                     "failed checking state of previous sync session");
-                return -1;
-        }
-
-        if (do_sync_dir(dir, backup_path, tmpfs_path) == -1) {
-                return -1;
-        }
-
-        return 0;
-}
-
-// actually copy and create directories and files
-static int do_sync_dir(struct Dir *dir, char *backup, char *tmpfs)
-{
         struct stat sb;
         bool did_something = false;
+
+        plog(LOG_INFO, "syncing directory %s", dir->path);
 
         // copy dir to tmpfs
         if (!DIREXISTS(tmpfs)) {
@@ -125,12 +120,17 @@ static int do_sync_dir(struct Dir *dir, char *backup, char *tmpfs)
         if (!did_something) {
                 plog(LOG_INFO, "no sync action was performed");
         }
+
         return 0;
 }
 
-static int unsync_dir(struct Dir *dir)
+static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
 {
+        struct stat sb;
         plog(LOG_INFO, "unsyncing directory %s", dir->path);
+
+        if (DIREXISTS(dir->path)) {
+        }
 
         return 0;
 }
