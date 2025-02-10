@@ -24,7 +24,6 @@ static int fix_backup(char *backup, char *tmpfs);
 static int fix_tmpfs(char *backup, char *tmpfs);
 
 static int recover_path(struct Dir *syncdir, const char *path);
-static int get_paths(struct Dir *dir, char *backup, char *tmpfs);
 
 // perform action on directories of browser
 int do_action_on_browser(struct Browser *browser, enum Action action)
@@ -371,7 +370,7 @@ static int recover_path(struct Dir *sync_dir, const char *path)
 
 // write backup and tmpfs path for dir in given buffers
 // buffers should be PATH_MAX in size
-static int get_paths(struct Dir *dir, char *backup, char *tmpfs)
+int get_paths(struct Dir *dir, char *backup, char *tmpfs)
 {
         // generate hash from path of dir to prevent filename conflicts
         char hash[41] = { 0 };

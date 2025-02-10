@@ -32,13 +32,15 @@ int main(int argc, char **argv)
                                          { "sync", no_argument, NULL, 's' },
                                          { "unsync", no_argument, NULL, 'u' },
                                          { "resync", no_argument, NULL, 'r' },
+                                         { "clean", no_argument, NULL, 'c' },
                                          { "status", no_argument, NULL, 'p' },
                                          { NULL, 0, NULL, 0 } };
 
         int opt, opt_index;
         enum Action action = ACTION_NONE;
+        bool status = false;
 
-        while ((opt = getopt_long(argc, argv, "Vvhsurp", long_options,
+        while ((opt = getopt_long(argc, argv, "Vvhsurcp", long_options,
                                   &opt_index)) != -1) {
                 switch (opt) {
                 case 'v':
@@ -59,12 +61,18 @@ int main(int argc, char **argv)
                 case 'r':
                         action = ACTION_RESYNC;
                         break;
+                case 'c':
+                        return 0;
                 case 'p':
-                        print_status();
+                        status = true;
                         break;
                 default:
                         return 0;
                 }
+        }
+        if (status) {
+                print_status();
+                return 0;
         }
 
         plog(LOG_INFO, "starting browser-on-ram " VERSION);
@@ -153,10 +161,64 @@ int uninit(void)
 
 void print_help(void)
 {
+        printf("Browser-on-ram " VERSION "\n");
+        printf("Usage: bor [option]\n\n");
+
+        printf("Options:\n");
+        printf("--version               show version\n");
+        printf("--verbose               show debug logs\n");
+        printf("--help                  show this message\n");
+        printf("--sync                  do sync\n");
+        printf("--unsync                do unsync\n");
+        printf("--resync                do resync\n");
+        printf("--clean                 remove recovery directories\n");
+        printf("--status                show current configuration & state\n");
+
+        printf("\nNot recommended to use sync functions directly.\n");
+        printf("Please use the systemd service and timer\n");
 }
 
 void print_status(void)
 {
+        init();
+
+        printf("Browser-on-ram " VERSION "\n");
+
+        bool service_active = sd_uunit_active("bor.service"),
+             timer_active = sd_uunit_active("bor-resync.timer");
+
+        printf("\nStatus:\n");
+        printf("Systemd service:         %s\n",
+               service_active ? "Active" : "Inactive");
+        printf("Systemd resync timer:    %s\n",
+               timer_active ? "Active" : "Inactive");
+        printf("Overlay:                 %s\n",
+               CONFIG.enable_overlay ? "Enabled" : "Disabled");
+
+        printf("\nDirectories:\n\n");
+
+        char backup[PATH_MAX];
+        char tmpfs[PATH_MAX];
+
+        for (size_t i = 0; i < CONFIG.browsers_num; i++) {
+                struct Browser *browser = CONFIG.browsers[i];
+
+                printf("Browser: %s\n", browser->name);
+
+                for (size_t k = 0; k < browser->dirs_num; k++) {
+                        struct Dir *dir = browser->dirs[i];
+
+                        if (get_paths(dir, backup, tmpfs) == -1) {
+                                printf("Error");
+                                continue;
+                        }
+
+                        printf("Directory:         %s\n", dir->path);
+                        printf("Backup:            %s\n", backup);
+                        printf("Tmpfs:             %s\n", tmpfs);
+                        printf("\n");
+                }
+        }
 }
 
 // vim: sw=8 ts=8
