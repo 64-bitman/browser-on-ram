@@ -3,7 +3,6 @@
 #include "types.h"
 #include "util.h"
 #include "config.h"
-#include "util.h"
 
 #include <unistd.h>
 #include <libgen.h>
@@ -306,20 +305,19 @@ static int recover_path(struct Dir *sync_dir, const char *path)
 static int get_paths(struct Dir *dir, char *backup, char *tmpfs)
 {
         // generate hash from path of dir to prevent filename conflicts
-        char *hash = get_sha1(dir->path);
+        char hash[41] = { 0 };
 
-        if (hash == NULL) {
+        if (sha1digest(NULL, hash, (uint8_t *)dir->path, PATH_MAX) != 0) {
                 PERROR();
                 return -1;
         }
+
         plog(LOG_DEBUG, "created dirname %s_%s for %s", hash, dir->dirname,
              dir->path);
 
         snprintf(backup, PATH_MAX, "%s/%s_%s", PATHS.backups, hash,
                  dir->dirname);
         snprintf(tmpfs, PATH_MAX, "%s/%s_%s", PATHS.tmpfs, hash, dir->dirname);
-
-        free(hash);
 
         return 0;
 }

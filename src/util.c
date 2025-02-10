@@ -6,7 +6,6 @@
 #include <ftw.h>
 #include <libgen.h>
 #include <unistd.h>
-#include <wordexp.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -15,12 +14,10 @@
 #include <stdarg.h>
 #include <stdbool.h>
 #include <stdio.h>
-#include <sys/sendfile.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-#include <openssl/sha.h>
 
 enum LogLevel LOG_LEVEL = LOG_INFO;
 
@@ -540,24 +537,6 @@ char *human_readable(off_t bytes)
         asprintf(&str, "%.4g %s", dblBytes, suffix[i]);
 
         return str;
-}
-
-// convert data into malloc'd string represented in hexadecimal
-char *get_sha1(const char *data)
-{
-        unsigned char hash[SHA_DIGEST_LENGTH];
-
-        SHA1((unsigned char *)data, strlen(data), hash);
-        char *out = calloc(61, sizeof(*out));
-
-        if (out == NULL) {
-                return NULL;
-        }
-
-        for (size_t i = 0; i < 20; i++) {
-                snprintf(out + i * 2, 4, "%02x", hash[i]);
-        }
-        return out;
 }
 
 // vim: sw=8 ts=8

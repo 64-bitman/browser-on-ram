@@ -8,7 +8,7 @@
 #include <sys/stat.h>
 #include <string.h>
 #include <errno.h>
-#include <openssl/sha.h>
+#include <stdint.h>
 
 // https://stackoverflow.com/a/12891181/12809652
 #ifdef __GNUC__
@@ -71,6 +71,8 @@ pid_t get_pid(const char *name);
 off_t get_dir_size(const char *path);
 char *human_readable(off_t bytes);
 
-char *get_sha1(const char *data);
+// from teeny-sha1.c
+int sha1digest(uint8_t *digest, char *hexdigest, const uint8_t *data,
+               size_t databytes);
 
 // vim: sw=8 ts=8

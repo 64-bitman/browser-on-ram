@@ -4,7 +4,7 @@ endif
 
 CC := gcc
 MACROS := -DINI_STOP_ON_FIRST_ERROR=1 -DINI_ALLOW_NO_VALUE=1 -DVERSION=\"$(shell git describe)\"
-CLIBS := $(shell pkg-config --cflags --libs libcap openssl)
+CLIBS := $(shell pkg-config --cflags --libs libcap)
 CFLAGS := -Wextra -Wall -Wshadow -Wcast-align=strict -Wno-format-truncation -std=gnu11 $(CLIBS) $(MACROS)
 DEBUG_FLAGS := -ggdb -g3 -DDEBUG -fsanitize=address,undefined -fanalyzer
 REL_FLAGS := -O2
@@ -31,7 +31,7 @@ INCLUDE_PATH := ./src/include
 TARGET_NAME := bor
 TARGET := $(BIN_PATH)/$(TARGET_NAME)
 
-SRC := main.c util.c config.c types.c sync.c overlay.c ini.c
+SRC := main.c util.c config.c types.c sync.c overlay.c ini.c teeny-sha1.c
 OBJ := $(addprefix $(OBJ_PATH)/, $(SRC:.c=.o))
 DEPS := $(addprefix $(DEP_PATH)/, $(notdir $(OBJ:.o=.d)))
 
