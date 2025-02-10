@@ -17,7 +17,10 @@
 #endif
 
 int do_action(enum Action action);
+
 int init(void);
+int uninit(void);
+
 void print_help(void);
 void print_status(void);
 
@@ -77,13 +80,13 @@ int main(int argc, char **argv)
 // loop through configured browsers and do sync/unsync/resync on them
 int do_action(enum Action action)
 {
-        if (action != ACTION_SYNC && action != ACTION_UNSYNC &&
-            action != ACTION_RESYNC) {
-                return 0;
-        }
-
         if (init() == -1) {
                 plog(LOG_ERROR, "failed initializing");
+                return -1;
+        }
+        if (create_dir(PATHS.backups, 0755) == -1 ||
+            create_dir(PATHS.tmpfs, 0755) == -1) {
+                plog(LOG_ERROR, "failed creating required directories");
                 return -1;
         }
 
@@ -105,17 +108,14 @@ int do_action(enum Action action)
                 }
         }
 
-        // cleanup directories
-        if (action == ACTION_UNSYNC) {
-                if (rmdir(PATHS.tmpfs)) {
-                        plog(LOG_WARN, "failed removing %s", PATHS.tmpfs);
-                }
+        if (action == ACTION_UNSYNC && uninit() == -1) {
+                plog(LOG_WARN, "failed uninitializing");
         }
 
         return 0;
 }
 
-// initialize & create paths and config
+// initialize paths and config
 int init(void)
 {
         plog(LOG_DEBUG, "initializing");
@@ -128,10 +128,24 @@ int init(void)
                 return -1;
         }
 
-        if (create_dir(PATHS.backups, 0755) == -1 ||
-            create_dir(PATHS.tmpfs, 0755) == -1) {
-                plog(LOG_ERROR, "failed creating required directories");
-                return -1;
+        return 0;
+}
+
+// remove certain directories and files (should be done after unsync)
+int uninit(void)
+{
+        // cleanup directories
+        if (rmdir(PATHS.tmpfs) == -1) {
+                plog(LOG_WARN, "failed removing %s", PATHS.tmpfs);
+        }
+
+        // delete temporary config file
+        char config_file[PATH_MAX];
+
+        snprintf(config_file, PATH_MAX, "%s/.bor.conf", PATHS.config);
+
+        if (unlink(config_file) == -1) {
+                plog(LOG_WARN, "failed removing .bor.conf");
         }
 
         return 0;
