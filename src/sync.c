@@ -138,8 +138,8 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
                 }
         } else if (LEXISTS(dir->path)) {
                 // not a symlink
-                plog(LOG_ERROR, "dir is not a symlink");
-                return -1;
+                plog(LOG_INFO, "already unsynced");
+                return 0;
         }
         if (DIREXISTS(tmpfs)) {
                 if (move_path(tmpfs, dir->path, false) == -1) {
@@ -188,10 +188,6 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
 // directories that are alone as recovery directories.
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs)
 {
-        if (fix_session(dir, backup, tmpfs) == -1) {
-                plog(LOG_ERROR, "failed checking state");
-                return -1;
-        }
         struct stat sb;
 
         if (DIREXISTS(dir->path)) {
@@ -203,6 +199,10 @@ static int repair_state(struct Dir *dir, char *backup, char *tmpfs)
                         plog(LOG_ERROR, "failed recovering directories");
                         return -1;
                 }
+        }
+        if (fix_session(dir, backup, tmpfs) == -1) {
+                plog(LOG_ERROR, "failed checking state");
+                return -1;
         }
 
         return 0;
@@ -219,7 +219,7 @@ static int fix_session(struct Dir *dir, char *backup, char *tmpfs)
         }
 
         // create symlink if it doesn't exist
-        if (DIREXISTS(tmpfs) && !SYMEXISTS(dir->path)) {
+        if (DIREXISTS(tmpfs) && !LEXISTS(dir->path)) {
                 plog(LOG_INFO, "symlink does not exist, creating it");
 
                 if (symlink(tmpfs, dir->path) == -1) {
@@ -340,9 +340,9 @@ static int recover_path(struct Dir *sync_dir, const char *path)
         char *recovery_path = NULL;
         char time_buf[100];
 
-        if (strftime(time_buf, 100, "%d-%m-%y_%H:%M:%S", time_info) == 0) {
-                asprintf(&recovery_path, "%s/%s_%s", parent_dir, time_buf,
-                         sync_dir->dirname);
+        if (strftime(time_buf, 100, "%d-%m-%y_%H:%M:%S", time_info) != 0) {
+                asprintf(&recovery_path, "%s/%s_%s", parent_dir,
+                         sync_dir->dirname, time_buf);
         } else {
                 plog(LOG_ERROR, "time is empty");
                 free(tmp);
@@ -360,7 +360,8 @@ static int recover_path(struct Dir *sync_dir, const char *path)
         free(recovery_path);
 
         if (move_path(path, unique_path, false) == -1) {
-                plog(LOG_ERROR, "failed renaming path as recovery directory");
+                plog(LOG_ERROR, "failed moving dir to %s", unique_path);
+                PERROR();
                 return -1;
         }
         plog(LOG_INFO, "saved path as %s", unique_path);

@@ -100,7 +100,10 @@ int init_config(bool save_config)
         snprintf(dotborconf, PATH_MAX, "%s/.bor.conf", PATHS.config);
 
         if (!save_config) {
-                goto parse;
+                if (parse_config(borconf) == -1) {
+                        return -1;
+                }
+                return 0;
         }
 
         // use .bor.conf if it exists, else copy bor.conf as .bor.conf
@@ -121,7 +124,6 @@ int init_config(bool save_config)
                 return -1;
         }
 
-parse:
         if (parse_config(dotborconf) == -1) {
                 return -1;
         }

@@ -29,6 +29,8 @@
 
 #define IS_DOT(fname) (STR_EQUAL(fname, ".") || STR_EQUAL(fname, ".."))
 
+#define MAX_FD 1024
+
 #define LOGCWD()                                       \
         do {                                           \
                 char logcwd_cwd[PATH_MAX];             \

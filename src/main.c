@@ -211,6 +211,7 @@ void print_status(void)
 
                 printf("Browser: %s\n", browser->name);
 
+                // TODO: unsync fails when browser is running
                 for (size_t k = 0; k < browser->dirs_num; k++) {
                         struct Dir *dir = browser->dirs[k];
 
