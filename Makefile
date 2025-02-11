@@ -58,7 +58,9 @@ test: all
 setcap:
 	sudo setcap 'cap_dac_override,cap_sys_admin=p' $(TARGET)
 
-install:
+install: install-files install-systemd
+
+install-files:
 	install -dm 755 $(PREFIX)/share/bor/scripts
 	install -Dm 755 $(BUILD_DIR)/bin/bor $(PREFIX)/bin/bor
 	install -Dm 644 scripts/*.sh $(PREFIX)/share/bor/scripts
