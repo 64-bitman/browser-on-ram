@@ -342,27 +342,22 @@ static int recover_path(struct Dir *sync_dir, const char *path)
                 return -1;
         }
 
-        char *recovery_path = NULL;
+        char recovery_path[PATH_MAX];
         char time_buf[100];
 
         if (strftime(time_buf, 100, "%d-%m-%y_%H:%M:%S", time_info) != 0) {
-                asprintf(&recovery_path, "%s/%s_%s", parent_dir,
-                         sync_dir->dirname, time_buf);
+                snprintf(recovery_path, PATH_MAX, "bor-crash_%s/%s_%s",
+                         parent_dir, sync_dir->dirname, time_buf);
         } else {
                 plog(LOG_ERROR, "time is empty");
                 free(tmp);
                 return -1;
         }
         free(tmp);
-        if (recovery_path == NULL) {
-                PERROR();
-                return -1;
-        }
 
         char unique_path[PATH_MAX];
 
         create_unique_path(unique_path, PATH_MAX, recovery_path);
-        free(recovery_path);
 
         if (move_path(path, unique_path, false) == -1) {
                 plog(LOG_ERROR, "failed moving dir to %s", unique_path);
