@@ -28,6 +28,6 @@ extern struct ConfigSkel CONFIG;
 extern struct PathsSkel PATHS;
 
 int init_paths(void);
-int init_config(void);
+int init_config(bool save_config);
 
 // vim: sw=8 ts=8

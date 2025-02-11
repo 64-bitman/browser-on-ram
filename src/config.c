@@ -83,8 +83,10 @@ int init_paths(void)
 }
 
 // initialize and parse config, requires paths to be initialized before
-int init_config(void)
+int init_config(bool save_config)
 {
+        struct stat sb;
+
         plog(LOG_DEBUG, "initializing config");
 
         // defaults
@@ -92,41 +94,35 @@ int init_config(void)
         CONFIG.enable_cache = false;
         CONFIG.resync_cache = true;
 
-        char prev_cwd[PATH_MAX];
+        char borconf[PATH_MAX], dotborconf[PATH_MAX];
 
-        if (getcwd(prev_cwd, PATH_MAX) == NULL || chdir(PATHS.config) == -1) {
-                PERROR();
-                return -1;
+        snprintf(borconf, PATH_MAX, "%s/bor.conf", PATHS.config);
+        snprintf(dotborconf, PATH_MAX, "%s/.bor.conf", PATHS.config);
+
+        if (!save_config) {
+                goto parse;
         }
-
-        struct stat sb;
 
         // use .bor.conf if it exists, else copy bor.conf as .bor.conf
         // this is so changes don't affect current sync session
-        if (FEXISTS("bor.conf")) {
-                if (!FEXISTS(".bor.conf")) {
-                        if (copy_path("bor.conf", ".bor.conf", false) == -1) {
+        if (FEXISTS(borconf)) {
+                if (!FEXISTS(dotborconf)) {
+                        if (copy_path(borconf, dotborconf, false) == -1) {
                                 plog(LOG_ERROR, "failed copying config file");
                                 PERROR();
-                                chdir(prev_cwd);
                                 return -1;
                         }
-                        if (chmod(".bor.conf", 0444) == -1) {
+                        if (chmod(dotborconf, 0444) == -1) {
                                 PERROR();
                         }
                 }
         } else {
                 plog(LOG_ERROR, "config file does not exist");
-                chdir(prev_cwd);
                 return -1;
         }
 
-        if (parse_config(".bor.conf") == -1) {
-                chdir(prev_cwd);
-                return -1;
-        }
-        if (chdir(prev_cwd) == -1) {
-                PERROR();
+parse:
+        if (parse_config(dotborconf) == -1) {
                 return -1;
         }
         return 0;

@@ -18,7 +18,7 @@
 
 int do_action(enum Action action);
 
-int init(void);
+int init(bool save_config);
 int uninit(void);
 
 void print_help(void);
@@ -88,7 +88,7 @@ int main(int argc, char **argv)
 // loop through configured browsers and do sync/unsync/resync on them
 int do_action(enum Action action)
 {
-        if (init() == -1) {
+        if (init(true) == -1) {
                 plog(LOG_ERROR, "failed initializing");
                 return -1;
         }
@@ -124,14 +124,15 @@ int do_action(enum Action action)
 }
 
 // initialize paths and config
-int init(void)
+// if save_config is true then make a .bor.conf file to save state
+int init(bool save_config)
 {
         plog(LOG_DEBUG, "initializing");
         if (init_paths() == -1) {
                 plog(LOG_ERROR, "failed initializing paths");
                 return -1;
         }
-        if (init_config() == -1) {
+        if (init_config(save_config) == -1) {
                 plog(LOG_ERROR, "failed initializing config");
                 return -1;
         }
@@ -142,9 +143,12 @@ int init(void)
 // remove certain directories and files (should be done after unsync)
 int uninit(void)
 {
+        struct stat sb;
+
         // cleanup directories
-        if (rmdir(PATHS.tmpfs) == -1) {
+        if (DIREXISTS(PATHS.tmpfs) && rmdir(PATHS.tmpfs) == -1) {
                 plog(LOG_WARN, "failed removing %s", PATHS.tmpfs);
+                PERROR();
         }
 
         // delete temporary config file
@@ -152,8 +156,9 @@ int uninit(void)
 
         snprintf(config_file, PATH_MAX, "%s/.bor.conf", PATHS.config);
 
-        if (unlink(config_file) == -1) {
+        if (FEXISTS(config_file) && unlink(config_file) == -1) {
                 plog(LOG_WARN, "failed removing .bor.conf");
+                PERROR();
         }
 
         return 0;
@@ -180,7 +185,7 @@ void print_help(void)
 
 void print_status(void)
 {
-        init();
+        init(false);
 
         printf("Browser-on-ram " VERSION "\n");
 
