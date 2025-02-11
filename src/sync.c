@@ -124,7 +124,7 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs)
         return 0;
 }
 
-// does not perform resync, must be done before
+// automatically resyncs directory
 static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
 {
         struct stat sb;
@@ -142,19 +142,24 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
                 return 0;
         }
         if (DIREXISTS(tmpfs)) {
-                if (move_path(tmpfs, dir->path, false) == -1) {
+                // update backup
+                if (copy_path(tmpfs, backup, false) == -1) {
                         plog(LOG_ERROR,
                              "failed moving tmpfs back to symlink location");
                         PERROR();
                         return -1;
                 }
         }
-        if (DIREXISTS(backup)) {
-                if (remove_dir(backup) == -1) {
-                        plog(LOG_ERROR, "failed removing backup");
-                        PERROR();
-                        return -1;
-                }
+        // move backup to dir location
+        if (move_path(backup, dir->path, false) == -1) {
+                plog(LOG_ERROR, "failed removing backup");
+                PERROR();
+                return -1;
+        }
+        if (remove_dir(tmpfs) == -1) {
+                plog(LOG_WARN, "failed removing tmpfs");
+                PERROR();
+                return -1;
         }
 
         return 0;
