@@ -197,6 +197,7 @@ void print_status(void)
 
         printf("\nDirectories:\n\n");
 
+        struct stat sb;
         char backup[PATH_MAX];
         char tmpfs[PATH_MAX];
 
@@ -206,17 +207,38 @@ void print_status(void)
                 printf("Browser: %s\n", browser->name);
 
                 for (size_t k = 0; k < browser->dirs_num; k++) {
-                        struct Dir *dir = browser->dirs[i];
+                        struct Dir *dir = browser->dirs[k];
 
                         if (get_paths(dir, backup, tmpfs) == -1) {
                                 printf("Error");
                                 continue;
                         }
+                        bool dir_exists = false;
+                        char *size = human_readable(get_dir_size(dir->path));
+                        char *type = (dir->type == DIR_PROFILE) ? "profile" :
+                                     (dir->type == DIR_CACHE)   ? "cache" :
+                                                                  "unknown";
 
-                        printf("Directory:         %s\n", dir->path);
-                        printf("Backup:            %s\n", backup);
-                        printf("Tmpfs:             %s\n", tmpfs);
+                        printf("Type:              %s\n", type);
+                        if (DIREXISTS(dir->path) || SYMEXISTS(dir->path)) {
+                                printf("Directory:         %s\n", dir->path);
+                                dir_exists = true;
+                        } else {
+                                printf("Directory:         %s (DOES NOT EXIST)\n",
+                                       dir->path);
+                        }
+                        if (DIREXISTS(backup)) {
+                                printf("Backup:            %s\n", backup);
+                        }
+                        if (DIREXISTS(tmpfs)) {
+                                printf("Tmpfs:             %s\n", tmpfs);
+                        }
+                        if (dir_exists) {
+                                printf("Size:              %s\n", size);
+                        }
                         printf("\n");
+
+                        free(size);
                 }
         }
 }

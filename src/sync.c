@@ -380,7 +380,7 @@ int get_paths(struct Dir *dir, char *backup, char *tmpfs)
                 return -1;
         }
 
-        plog(LOG_DEBUG, "created dirname %s_%s for %s", hash, dir->dirname,
+        plog(LOG_DEBUG, "using dirname %s_%s for %s", hash, dir->dirname,
              dir->path);
 
         snprintf(backup, PATH_MAX, "%s/%s_%s", PATHS.backups, hash,

@@ -235,10 +235,13 @@ static struct Browser *run_browser_sh(const char *browsername)
                 goto exit;
         }
         if (found_num == 0) {
-                plog(LOG_ERROR, "no shell script found for browser");
+                plog(LOG_ERROR, "no shell script found for browser %s",
+                     browsername);
                 err = -1;
                 goto exit;
         }
+
+        plog(LOG_DEBUG, "found %s", found[0]);
 
         // only use first script found
         if (parse_browser_sh(found[0], browser) == -1) {
