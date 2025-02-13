@@ -66,8 +66,9 @@ install-files:
 	install -Dm 644 scripts/*.sh $(PREFIX)/share/bor/scripts
 
 install-systemd:
-	install -dm 755 $(PREFIX)/lib/systemd/user
-	install -Dm 644 systemd/* $(PREFIX)/lib/systemd/user
+	install -dm 755 $(PREFIX)/lib/systemd/{user,system}
+	install -Dm 644 systemd/user/* $(PREFIX)/lib/systemd/user
+	install -Dm 644 systemd/system/* $(PREFIX)/lib/systemd/system/
 
 install-cap:
 	setcap 'cap_dac_override,cap_sys_admin=p' $(PREFIX)/bin/bor

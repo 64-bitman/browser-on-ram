@@ -1,9 +1,0 @@
-[Unit]
-Description=Hourly timer for browser-on-ram
-BindsTo=bor.service
-Requires=bor-resync.service
-
-[Timer]
-OnActiveSec=1h
-
-# vim: ft=systemd
