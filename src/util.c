@@ -236,6 +236,7 @@ int copy_path(const char *src, const char *dest, bool include_root)
 static int remove_dir_handler(const char *fpath, const struct stat *sb,
                               int UNUSED(typeflag), struct FTW *UNUSED(ftwbuf))
 {
+        // cannot chmod a symlink
         if (!S_ISLNK(sb->st_mode) && chmod(fpath, S_IWUSR) == -1) {
                 return -1;
         } else if (remove(fpath) == -1) {
@@ -263,6 +264,22 @@ int remove_dir(const char *path)
                 return -1;
         }
 
+        return 0;
+}
+
+int remove_path(const char *path)
+{
+        // try using remove() and then remove_dir if path is not empty
+        errno = 0;
+        if (remove(path) == -1) {
+                int err = 0;
+                if (errno == ENOTEMPTY) {
+                        err = remove_dir(path);
+                }
+                if (errno != 0 || err == -1) {
+                        return -1;
+                }
+        }
         return 0;
 }
 
@@ -305,6 +322,28 @@ int move_path(const char *src, const char *dest, bool include_root)
                         }
                         return 0;
                 }
+                return -1;
+        }
+
+        return 0;
+}
+
+// replace target with src atomically, works over different filesystems
+// deletes target after its been swapped
+int replace_paths(const char *target, const char *src)
+{
+        char beside_path[PATH_MAX];
+
+        create_unique_path(beside_path, PATH_MAX, target);
+
+        if (move_path(src, beside_path, false) == -1) {
+                return -1;
+        }
+        if (renameat2(AT_FDCWD, beside_path, AT_FDCWD, target,
+                      RENAME_EXCHANGE) == -1) {
+                return -1;
+        }
+        if (remove_path(beside_path) == -1) {
                 return -1;
         }
 

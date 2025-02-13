@@ -7,6 +7,7 @@
 #include <unistd.h>
 #include <libgen.h>
 #include <stdlib.h>
+#include <fcntl.h>
 
 #include <sys/types.h>
 #include <string.h>
@@ -130,34 +131,29 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
         struct stat sb;
         plog(LOG_INFO, "unsyncing directory %s", dir->path);
 
-        if (SYMEXISTS(dir->path)) {
-                if (unlink(dir->path) == -1) {
-                        plog(LOG_ERROR, "failed removing symlink");
-                        PERROR();
-                        return -1;
-                }
-        } else if (LEXISTS(dir->path)) {
+        if (LEXISTS(dir->path) && !SYMEXISTS(dir->path)) {
                 // not a symlink
                 plog(LOG_INFO, "already unsynced");
                 return 0;
         }
         if (DIREXISTS(tmpfs)) {
-                // update backup
+                // sync backup if tmpfs exists
                 if (copy_path(tmpfs, backup, false) == -1) {
                         plog(LOG_ERROR,
                              "failed moving tmpfs back to symlink location");
                         PERROR();
                         return -1;
                 }
+        } else if (!DIREXISTS(backup)) {
+                plog(LOG_ERROR, "backup nor tmpfs exists, cannot unsync");
+                return -1;
         }
-        // move backup to dir location
-        if (move_path(backup, dir->path, false) == -1) {
-                plog(LOG_ERROR, "failed removing backup");
-                PERROR();
+        if (replace_paths(dir->path, backup) == -1) {
+                plog(LOG_ERROR, "failed replace dir with backup");
                 return -1;
         }
         if (remove_dir(tmpfs) == -1) {
-                plog(LOG_WARN, "failed removing tmpfs");
+                plog(LOG_ERROR, "failed removing tmpfs");
                 PERROR();
                 return -1;
         }

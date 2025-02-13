@@ -59,7 +59,10 @@ int trim(char *str);
 
 int copy_path(const char *src, const char *dest, bool include_root);
 int remove_dir(const char *path);
+int remove_path(const char *path);
+
 int move_path(const char *src, const char *dest, bool include_root);
+int replace_paths(const char *target, const char *src);
 
 void create_unique_path(char *buf, size_t buf_size, const char *path);
 bool file_has_bad_perms(const char *path);
