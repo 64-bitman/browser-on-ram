@@ -1,5 +1,6 @@
 #include "config.h"
 #include "sync.h"
+#include "overlay.h"
 #include "util.h"
 
 #include <getopt.h>
@@ -10,7 +11,6 @@
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
-#include <sys/capability.h>
 
 #ifndef VERSION
 #define VERSION "UNKNOWN"
@@ -20,6 +20,10 @@ int do_action(enum Action action);
 
 int init(bool save_config);
 int uninit(void);
+
+int mount_overlay(void);
+int unmount_overlay(void);
+bool overlay_mounted(void);
 
 void print_help(void);
 void print_status(void);
@@ -95,7 +99,22 @@ int do_action(enum Action action)
         if (create_dir(PATHS.backups, 0755) == -1 ||
             create_dir(PATHS.tmpfs, 0755) == -1) {
                 plog(LOG_ERROR, "failed creating required directories");
+                PERROR();
                 return -1;
+        }
+        size_t synced = 0;
+        bool overlay = false;
+
+        // check if we have required capabilities
+        // do it before any action so that unsync/resync
+        // works properly in case we don't
+        if (CONFIG.enable_overlay &&
+            !check_caps_state(CAP_PERMITTED, CAP_SET, 2, CAP_SYS_ADMIN,
+                              CAP_DAC_OVERRIDE)) {
+                plog(LOG_WARN, "CAP_SYS_ADMIN and CAP_DAC_OVERRIDE "
+                               "is needed for overlay feature");
+        } else if (CONFIG.enable_overlay) {
+                overlay = true;
         }
 
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {
@@ -109,11 +128,26 @@ int do_action(enum Action action)
                 }
                 // if a directory or entire browser was not u/r/synced (error)
                 // then skip it and still continue
-                if (do_action_on_browser(browser, action) == -1) {
+                if (do_action_on_browser(browser, action, overlay) == -1) {
                         plog(LOG_WARN, "failed %sing browser %s",
                              action_str[action], browser->name);
                         continue;
                 }
+                synced++;
+        }
+        // we mount after because modifying lowerdir before mount
+        // doesn't reflect changes
+        if (synced > 0 && overlay && action == ACTION_SYNC &&
+            mount_overlay() == -1) {
+                plog(LOG_ERROR, "failed creating overlay");
+                return -1;
+        }
+
+        // dont check for overlay bool, error if we don't have perms
+        if (action == ACTION_UNSYNC && overlay_mounted() &&
+            unmount_overlay() == -1) {
+                plog(LOG_ERROR, "failed removing overlay");
+                return -1;
         }
 
         if (action == ACTION_UNSYNC && uninit() == -1) {
@@ -200,11 +234,20 @@ void print_status(void)
         printf("Overlay:                 %s\n",
                CONFIG.enable_overlay ? "Enabled" : "Disabled");
 
+        if (overlay_mounted()) {
+                // totol overlay upper size
+                char *tosize =
+                        human_readable(get_dir_size(PATHS.overlay_upper));
+
+                printf("Total overlay size:      %s\n", tosize);
+
+                free(tosize);
+        }
+
         printf("\nDirectories:\n\n");
 
         struct stat sb;
-        char backup[PATH_MAX];
-        char tmpfs[PATH_MAX];
+        char backup[PATH_MAX], tmpfs[PATH_MAX], otmpfs[PATH_MAX];
 
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {
                 struct Browser *browser = CONFIG.browsers[i];
@@ -216,11 +259,10 @@ void print_status(void)
                         struct Dir *dir = browser->dirs[k];
 
                         if (get_paths(dir, backup, tmpfs) == -1) {
-                                printf("Error");
+                                printf("Error\n");
                                 continue;
                         }
                         bool dir_exists = false;
-                        char *size = human_readable(get_dir_size(dir->path));
                         char *type = (dir->type == DIR_PROFILE) ? "profile" :
                                      (dir->type == DIR_CACHE)   ? "cache" :
                                                                   "unknown";
@@ -240,11 +282,24 @@ void print_status(void)
                                 printf("Tmpfs:             %s\n", tmpfs);
                         }
                         if (dir_exists) {
+                                char *size =
+                                        human_readable(get_dir_size(dir->path));
                                 printf("Size:              %s\n", size);
+                                free(size);
+                        }
+                        if (overlay_mounted()) {
+                                if (get_overlay_paths(dir, otmpfs) == -1) {
+                                        printf("Error\n");
+                                        continue;
+                                }
+                                char *osize =
+                                        human_readable(get_dir_size(otmpfs));
+
+                                printf("Overlay size:      %s\n", osize);
+
+                                free(osize);
                         }
                         printf("\n");
-
-                        free(size);
                 }
         }
 }

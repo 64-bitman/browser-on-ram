@@ -276,7 +276,7 @@ int remove_path(const char *path)
                 if (errno == ENOTEMPTY) {
                         err = remove_dir(path);
                 }
-                if (errno != 0 || err == -1) {
+                if (errno != EISDIR && (errno != 0 || err == -1)) {
                         return -1;
                 }
         }
@@ -543,6 +543,12 @@ off_t get_dir_size(const char *path)
 // convert size in bytes to malloc'd string in human readable format
 char *human_readable(off_t bytes)
 {
+        if (bytes < 0) {
+                char *str = NULL;
+                asprintf(&str, "UNKNOWN");
+                return str;
+        }
+
         char *suffix[] = { "B", "KB", "MB", "GB", "TB" };
         char length = sizeof(suffix) / sizeof(suffix[0]);
 

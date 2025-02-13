@@ -15,8 +15,8 @@
 #include <dirent.h>
 #include <stdbool.h>
 
-static int sync_dir(struct Dir *dir, char *backup, char *tmpfs);
-static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs);
+static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
+static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
 static int resync_dir(struct Dir *dir, char *backup, char *tmpfs);
 
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs);
@@ -27,7 +27,8 @@ static int fix_tmpfs(char *backup, char *tmpfs);
 static int recover_path(struct Dir *syncdir, const char *path);
 
 // perform action on directories of browser
-int do_action_on_browser(struct Browser *browser, enum Action action)
+int do_action_on_browser(struct Browser *browser, enum Action action,
+                         bool overlay)
 {
         plog(LOG_INFO, "%sing browser %s", action_str[action], browser->name);
 
@@ -56,9 +57,9 @@ int do_action_on_browser(struct Browser *browser, enum Action action)
 
                 // perform action
                 if (action == ACTION_SYNC) {
-                        err = sync_dir(dir, backup, tmpfs);
+                        err = sync_dir(dir, backup, tmpfs, overlay);
                 } else if (action == ACTION_UNSYNC) {
-                        err = unsync_dir(dir, backup, tmpfs);
+                        err = unsync_dir(dir, backup, tmpfs, overlay);
                 } else if (action == ACTION_RESYNC) {
                         err = resync_dir(dir, backup, tmpfs);
                 }
@@ -71,7 +72,8 @@ int do_action_on_browser(struct Browser *browser, enum Action action)
         return 0;
 }
 
-static int sync_dir(struct Dir *dir, char *backup, char *tmpfs)
+// if overlay is true then don't copy to tmpfs
+static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
 {
         // don't sync if cache dirs not enabled
         if (!CONFIG.enable_cache && dir->type == DIR_CACHE) {
@@ -82,8 +84,8 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs)
 
         plog(LOG_INFO, "syncing directory %s", dir->path);
 
-        // copy dir to tmpfs
-        if (!DIREXISTS(tmpfs)) {
+        // copy dir to tmpfs if we are not mounted (overlay)
+        if (!overlay && !DIREXISTS(tmpfs)) {
                 if (copy_path(dir->path, tmpfs, false) == -1) {
                         plog(LOG_ERROR, "failed copying dir to tmpfs");
                         PERROR();
@@ -126,7 +128,7 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs)
 }
 
 // automatically resyncs directory
-static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
+static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
 {
         struct stat sb;
         plog(LOG_INFO, "unsyncing directory %s", dir->path);
@@ -138,6 +140,7 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
         }
         if (DIREXISTS(tmpfs)) {
                 // sync backup if tmpfs exists
+                // if overlay is mounted use the upper dir
                 if (copy_path(tmpfs, backup, false) == -1) {
                         plog(LOG_ERROR,
                              "failed moving tmpfs back to symlink location");
@@ -149,10 +152,13 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs)
                 return -1;
         }
         if (replace_paths(dir->path, backup) == -1) {
-                plog(LOG_ERROR, "failed replace dir with backup");
+                plog(LOG_ERROR, "failed to replace dir with backup");
+                PERROR();
                 return -1;
         }
-        if (remove_dir(tmpfs) == -1) {
+        // we don't need to remove tmpfs if overlay is mounted
+        // because it will disappear after unmount anyways
+        if (!overlay && remove_dir(tmpfs) == -1) {
                 plog(LOG_ERROR, "failed removing tmpfs");
                 PERROR();
                 return -1;
@@ -372,7 +378,8 @@ int get_paths(struct Dir *dir, char *backup, char *tmpfs)
         // generate hash from path of dir to prevent filename conflicts
         char hash[41] = { 0 };
 
-        if (sha1digest(NULL, hash, (uint8_t *)dir->path, PATH_MAX) != 0) {
+        if (sha1digest(NULL, hash, (uint8_t *)dir->path, strlen(dir->path)) !=
+            0) {
                 PERROR();
                 return -1;
         }
@@ -383,6 +390,26 @@ int get_paths(struct Dir *dir, char *backup, char *tmpfs)
         snprintf(backup, PATH_MAX, "%s/%s_%s", PATHS.backups, hash,
                  dir->dirname);
         snprintf(tmpfs, PATH_MAX, "%s/%s_%s", PATHS.tmpfs, hash, dir->dirname);
+
+        return 0;
+}
+
+// same as get_paths but only return tmpfs located in upper
+int get_overlay_paths(struct Dir *dir, char *tmpfs)
+{
+        char hash[41] = { 0 };
+
+        if (sha1digest(NULL, hash, (uint8_t *)dir->path, strlen(dir->path)) !=
+            0) {
+                PERROR();
+                return -1;
+        }
+
+        plog(LOG_DEBUG, "using overlay dirname %s_%s for %s", hash,
+             dir->dirname, dir->path);
+
+        snprintf(tmpfs, PATH_MAX, "%s/%s_%s", PATHS.overlay_upper, hash,
+                 dir->dirname);
 
         return 0;
 }

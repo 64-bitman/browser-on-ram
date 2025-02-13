@@ -22,6 +22,8 @@ struct PathsSkel {
         char backups[PATH_MAX];
         char share_dir[PATH_MAX];
         char share_dir_local[PATH_MAX];
+        char overlay_upper[PATH_MAX];
+        char overlay_work[PATH_MAX];
 };
 
 extern struct ConfigSkel CONFIG;

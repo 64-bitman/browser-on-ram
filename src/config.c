@@ -73,6 +73,9 @@ int init_paths(void)
         snprintf(PATHS.share_dir, PATH_MAX, "/usr/share/bor/");
         snprintf(PATHS.share_dir_local, PATH_MAX, "/usr/local/share/bor");
 
+        snprintf(PATHS.overlay_upper, PATH_MAX, "%s/upper", PATHS.runtime);
+        snprintf(PATHS.overlay_work, PATH_MAX, "%s/work", PATHS.runtime);
+
         plog(LOG_DEBUG, "config dir: %s", PATHS.config);
         plog(LOG_DEBUG, "runtime dir: %s", PATHS.runtime);
 
