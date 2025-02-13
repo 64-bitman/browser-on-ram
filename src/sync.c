@@ -32,8 +32,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
 {
         plog(LOG_INFO, "%sing browser %s", action_str[action], browser->name);
 
-        char backup[PATH_MAX];
-        char tmpfs[PATH_MAX];
+        char backup[PATH_MAX], tmpfs[PATH_MAX];
 
         for (size_t i = 0; i < browser->dirs_num; i++) {
                 struct Dir *dir = browser->dirs[i];

@@ -137,15 +137,21 @@ int do_action(enum Action action)
         }
         // we mount after because modifying lowerdir before mount
         // doesn't reflect changes
-        if (synced > 0 && overlay && action == ACTION_SYNC &&
-            mount_overlay() == -1) {
-                plog(LOG_ERROR, "failed creating overlay");
-                return -1;
+        if (synced > 0 && overlay && action == ACTION_SYNC) {
+                if (overlay_mounted()) {
+                        plog(LOG_WARN,
+                             "tmpfs is mounted, cannot mount overlay; please check");
+                } else if (mount_overlay() == -1) {
+                        plog(LOG_ERROR, "failed creating overlay");
+                        return -1;
+                }
         }
 
-        // dont check for overlay bool, error if we don't have perms
-        if (action == ACTION_UNSYNC && overlay_mounted() &&
-            unmount_overlay() == -1) {
+        if (!overlay && overlay_mounted()) {
+                plog(LOG_WARN,
+                     "tmpfs is mounted, but required capabilities do not exist");
+        } else if (action == ACTION_UNSYNC && overlay_mounted() &&
+                   unmount_overlay() == -1) {
                 plog(LOG_ERROR, "failed removing overlay");
                 return -1;
         }
