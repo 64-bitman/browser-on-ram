@@ -1,0 +1,15 @@
+[Unit]
+Description=Browser-on-ram
+Wants=bor-resync.timer
+RequiresMountsFor=/home/
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=bor --sync --verbose
+ExecStop=bor --unsync --verbose
+
+[Install]
+WantedBy=default.target
+
+# vim: ft=systemd

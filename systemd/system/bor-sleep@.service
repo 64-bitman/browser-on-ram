@@ -1,0 +1,12 @@
+[Unit]
+Description=Resync on system sleep
+Before=sleep.target
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/systemctl --user --machine=%i@ start --wait bor-sleep.target
+
+[Install]
+WantedBy=sleep.target
+
+# vim: ft=systemd

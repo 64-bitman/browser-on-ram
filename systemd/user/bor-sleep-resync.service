@@ -1,0 +1,13 @@
+[Unit]
+Description=Timed resync
+BindsTo=bor.service
+After=bor.service
+
+[Service]
+Type=oneshot
+ExecStart=bor --resync --verbose
+
+[Install]
+WantedBy=bor-sleep.target
+
+# vim: ft=systemd
