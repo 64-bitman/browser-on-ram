@@ -55,6 +55,9 @@ int init_paths(void)
         } else {
                 snprintf(xdg_runtime_dir, PATH_MAX, "/run/user/%d", getuid());
         }
+        trim(xdg_config_home);
+        trim(xdg_runtime_dir);
+
         // expand paths to absolute
         char *rl_config = realpath(xdg_config_home, NULL),
              *rl_runtime = realpath(xdg_runtime_dir, NULL);

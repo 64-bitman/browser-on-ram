@@ -18,8 +18,11 @@ struct Dir *new_dir(const char *path, enum DirType type,
         char *bn = NULL, *parent_dir = NULL;
 
         snprintf(buf, PATH_MAX, "%s", path);
+        trim(buf);
         bn = basename(buf);
+
         snprintf(buf, PATH_MAX, "%s", path);
+        trim(buf);
         parent_dir = dirname(buf);
 
         // only expand path excluding basename

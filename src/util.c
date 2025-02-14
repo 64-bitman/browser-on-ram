@@ -172,8 +172,9 @@ int trim(char *str)
                 end--;
         }
         char *copy = strdup(str);
-        if (copy == NULL)
+        if (copy == NULL) {
                 return -1;
+        }
 
         snprintf(str, end - start + 2, "%s", copy + start);
 

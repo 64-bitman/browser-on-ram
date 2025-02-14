@@ -46,6 +46,12 @@
                 }                                                            \
         } while (0)
 
+#define TRIM(buf, str)                                     \
+        do {                                               \
+                snprintf(buf, strlen(str) + 1, "%s", str); \
+                trim(buf);                                 \
+        } while (0)
+
 enum LogLevel { LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR };
 
 extern enum LogLevel LOG_LEVEL;
