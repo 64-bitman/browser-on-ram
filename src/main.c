@@ -242,13 +242,18 @@ void print_status(void)
 
         if (overlay_mounted()) {
                 // totol overlay upper size
-                char *tosize =
+                char *otosize =
                         human_readable(get_dir_size(PATHS.overlay_upper));
 
-                printf("Total overlay size:      %s\n", tosize);
+                printf("Total overlay size:      %s\n", otosize);
 
-                free(tosize);
+                free(otosize);
         }
+        char *tosize = human_readable(get_dir_size(PATHS.tmpfs));
+
+        printf("Total size               %s\n", tosize);
+
+        free(tosize);
 
         printf("\nDirectories:\n\n");
 
