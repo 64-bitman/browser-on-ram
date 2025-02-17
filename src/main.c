@@ -108,7 +108,7 @@ int do_action(enum Action action)
                 PERROR();
                 return -1;
         }
-        size_t synced = 0;
+        size_t did_action = 0;
         bool overlay = false;
 
         // check if we have required capabilities
@@ -139,11 +139,11 @@ int do_action(enum Action action)
                              action_str[action], browser->name);
                         continue;
                 }
-                synced++;
+                did_action++;
         }
         // we mount after because modifying lowerdir before mount
         // doesn't reflect changes
-        if (synced > 0 && overlay && action == ACTION_SYNC) {
+        if (did_action > 0 && overlay && action == ACTION_SYNC) {
                 if (overlay_mounted()) {
                         plog(LOG_WARN,
                              "tmpfs is mounted, cannot mount overlay; please check");
