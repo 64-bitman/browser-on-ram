@@ -92,8 +92,9 @@ These should be placed in `$XDG_CONFIG_HOME/bor/scripts`, `/usr/local/share/bor/
 used. Please also make a pull request too!
 
 # Projects Used
-* [inih](https://github.com/benhoyt/inih)
-* [teeny-sha1](https://github.com/CTrabant/teeny-sha1)
+* [inih](https://github.com/benhoyt/inih) - ini format parsing
+* [teeny-sha1](https://github.com/CTrabant/teeny-sha1) - creating hashes for directories
+* [profile-sync-daemon](https://github.com/graysky2/profile-sync-daemon) - used their existing browser scripts as templates
 
 # License
 [MIT License](LICENSE)
