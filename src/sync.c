@@ -169,6 +169,10 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
 
 static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
 {
+        if (!CONFIG.resync_cache && dir->type == DIR_CACHE) {
+                return 0;
+        }
+
         struct stat sb;
 
         plog(LOG_INFO, "resyncing directory %s", dir->path);
