@@ -28,9 +28,7 @@ sudo make install-cap
 
 Browser-on-ram can mount your data on an overlay filesystem, which can significantly reduce memory usage, as only
 changed data needs to be stored on RAM. To do this, it uses Linux capabilities (specifically SYS_ADMIN_CAP and
-SYS_DAC_OVERRIDE), which are unfortunately very broad (But I supposed better than setuid). By default they are in permitted mode (doesn't actually affect the program), and are only raised
-:w
-to effective mode when mounting the overlay filesystem and deleting the root owned work directory needed by the
+SYS_DAC_OVERRIDE), which are unfortunately very broad (But I supposed better than setuid). By default they are in permitted mode (doesn't actually affect the program), and are only raised to effective mode when mounting the overlay filesystem and deleting the root owned work directory needed by the
 overlay filesystem. If anything related to interacting with capabilties fails, the program immediately exits.
 
 # Supported Browsers
