@@ -7,7 +7,7 @@
 
 # Warning
 
-RAM is not persistent! You may lose up to an hour of browsing usage data with the automatic resync timer.
+RAM is not persistent! You may lose up to an hour of browsing usage data with the automatic resync timer if your system suddenly exits/crashes.
 Additionally, before using this program for the first time, make sure to backup your data! I believe this software to
 be stable in terms of not randomly wiping your data, and have included safety/integrity checks & repairs, but it's
 always better to be safe.
