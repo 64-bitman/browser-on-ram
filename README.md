@@ -19,6 +19,10 @@ In brackets are the names to be used in the config file
 * Firefox (firefox)
 * Chromium (chromium)
 * Google-chrome (google-chrome-stable, google-chrome-beta, google-chrome-unstable)
+* Vivaldi (vivaldi, vivaldi-snapshot)
+* Opera (opera)
+* Brave (brave)
+* Falkon (falkon)
 
 # Dependencies
 
