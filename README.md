@@ -12,6 +12,20 @@ Additionally, before using this program for the first time, make sure to backup 
 be stable in terms of not randomly wiping your data, and have included safety/integrity checks & repairs, but it's
 always better to be safe.
 
+# Supported Browsers
+
+* Firefox
+* Chromium
+* Google-chrome
+
+# Dependencies
+
+```
+gcc
+libcap
+rsync
+```
+
 # Install
 
 ```sh
@@ -24,18 +38,38 @@ sudo RELEASE=1 make install
 sudo make install-cap
 ```
 
+# Usage
+
+The recommended way is to use the systemd service, you can enable it it via
+`systemctl --user enable --now bor.service`, note that any configured browsers
+that are running will not be synced (you should close them first). This will
+also start the hourly resync timer `bor-resync.timer`. If you want to resync on
+sleep, then enable run `systemctl enable bor-sleep@$(whoami).service` and
+`systemctl --user enable bor-sleep-resync.service`.
+
+# Config
+Sample config file, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
+```ini
+[config]
+# sync cache directories
+enable_cache = <boolean>
+
+# resync them (will be resynced when unsynced however)
+resync_cache = <boolean>
+
+# enable overlay filesystem
+enable_overlay = <boolean>
+```
+
 # Overlay
 
 Browser-on-ram can mount your data on an overlay filesystem, which can significantly reduce memory usage, as only
 changed data needs to be stored on RAM. To do this, it uses Linux capabilities (specifically SYS_ADMIN_CAP and
-SYS_DAC_OVERRIDE), which are unfortunately very broad (But I supposed better than setuid). By default they are in permitted mode (doesn't actually affect the program), and are only raised to effective mode when mounting the overlay filesystem and deleting the root owned work directory needed by the
+SYS_DAC_OVERRIDE), which are unfortunately very broad (But I supposed better than setuid). By default they are in permitted mode (doesn't actually affect the program),
+and are only raised to effective mode when mounting the overlay filesystem and deleting the root owned work directory needed by the
 overlay filesystem. If anything related to interacting with capabilties fails, the program immediately exits.
 
-# Supported Browsers
-
-* Firefox
-* Chromium
-* Google-chrome
+#
 
 # Adding Browsers
 
@@ -56,20 +90,6 @@ profile = /home/user/.config/mybrowser
 ```
 These should be placed in `$XDG_CONFIG_HOME/bor/scripts`, `/usr/local/share/bor/scripts`, `/usr/share/bor/scripts`. The first one found in that order is
 used. Please also make a pull request too!
-
-# Config
-Sample config file, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
-```ini
-[config]
-# sync cache directories
-enable_cache = <boolean>
-
-# resync them (will be resynced when unsynced however)
-resync_cache = <boolean>
-
-# enable overlay filesystem
-enable_overlay = <boolean>
-```
 
 # Projects Used
 * [inih](https://github.com/benhoyt/inih)
