@@ -55,7 +55,7 @@ Sample config file, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
 # <boolean> = true or false
 
 [config]
-# sync cache directories
+# sync cache directories (if the browser has ones)
 enable_cache = <boolean>
 
 # resync them (will be resynced when unsynced however)
@@ -97,8 +97,8 @@ profile = /home/user/.config/mybrowser
 
 # ... <additional cache/profiles>
 ```
-These should be placed in `$XDG_CONFIG_HOME/bor/scripts`, `/usr/local/share/bor/scripts`, `/usr/share/bor/scripts`. The first one found in that order is
-used. Please also make a pull request too!
+These should be placed in `$XDG_CONFIG_HOME/bor/scripts`, `/usr/local/share/bor/scripts`, `/usr/share/bor/scripts` with `.sh` extension.
+The first one found in that order is used. Please also make a pull request too!
 
 # Projects Used
 * [inih](https://github.com/benhoyt/inih) - ini format parsing
