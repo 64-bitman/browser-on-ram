@@ -14,9 +14,11 @@ always better to be safe.
 
 # Supported Browsers
 
-* Firefox
-* Chromium
-* Google-chrome
+In brackets are the names to be used in the config file
+
+* Firefox (firefox)
+* Chromium (chromium)
+* Google-chrome (google-chrome-stable, google-chrome-beta, google-chrome-unstable)
 
 # Dependencies
 
@@ -50,6 +52,8 @@ sleep, then enable run `systemctl enable bor-sleep@$(whoami).service` and
 # Config
 Sample config file, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
 ```ini
+# <boolean> = true or false
+
 [config]
 # sync cache directories
 enable_cache = <boolean>
@@ -59,6 +63,11 @@ resync_cache = <boolean>
 
 # enable overlay filesystem
 enable_overlay = <boolean>
+
+[browsers]
+mybrowser
+myotherbrowser
+# ...
 ```
 
 # Overlay
