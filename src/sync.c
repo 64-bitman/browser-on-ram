@@ -26,6 +26,8 @@ static int fix_tmpfs(char *backup, char *tmpfs);
 
 static int recover_path(struct Dir *syncdir, const char *path);
 
+static bool directory_is_safe(struct Dir *dir);
+
 // perform action on directories of browser
 int do_action_on_browser(struct Browser *browser, enum Action action,
                          bool overlay)
@@ -37,6 +39,12 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
         for (size_t i = 0; i < browser->dirs_num; i++) {
                 struct Dir *dir = browser->dirs[i];
                 int err = 0;
+
+                if (!directory_is_safe(dir)) {
+                        plog(LOG_WARN, "directory %s is unsafe, skipping",
+                             dir->path);
+                        continue;
+                }
 
                 // find required paths
                 if (get_paths(dir, backup, tmpfs) == -1) {
@@ -74,11 +82,17 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
 // if overlay is true then don't copy to tmpfs
 static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
 {
+        struct stat sb;
+
+        if (!DIREXISTS(dir->path)) {
+                plog(LOG_ERROR, "directory %s does not exist", dir->path);
+                return -1;
+        }
+
         // don't sync if cache dirs not enabled
         if (!CONFIG.enable_cache && dir->type == DIR_CACHE) {
                 return 0;
         }
-        struct stat sb;
         bool did_something = false;
 
         plog(LOG_INFO, "syncing directory %s", dir->path);
@@ -419,3 +433,26 @@ int get_overlay_paths(struct Dir *dir, char *tmpfs)
 }
 
 // vim: sw=8 ts=8
+
+// return true if directory and its parent directory is safe to handle
+static bool directory_is_safe(struct Dir *dir)
+{
+        char buf[PATH_MAX];
+
+        snprintf(buf, PATH_MAX, "%s", dir->path);
+        char *parent = dirname(buf);
+
+        struct stat sb;
+
+        if (lstat(dir->path, &sb) == 0) {
+                if (file_has_bad_perms(dir->path)) {
+                        return false;
+                }
+        }
+
+        if (file_has_bad_perms(parent)) {
+                return false;
+        }
+
+        return true;
+}

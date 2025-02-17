@@ -14,16 +14,16 @@ struct Dir *new_dir(const char *path, enum DirType type,
 {
         struct stat sb;
 
-        char buf[PATH_MAX], rlpath[PATH_MAX];
+        char buf[PATH_MAX], buf2[PATH_MAX], rlpath[PATH_MAX];
         char *bn = NULL, *parent_dir = NULL;
 
         snprintf(buf, PATH_MAX, "%s", path);
         trim(buf);
         bn = basename(buf);
 
-        snprintf(buf, PATH_MAX, "%s", path);
+        snprintf(buf2, PATH_MAX, "%s", path);
         trim(buf);
-        parent_dir = dirname(buf);
+        parent_dir = dirname(buf2);
 
         // only expand path excluding basename
         if (realpath(parent_dir, rlpath) == NULL || !DIREXISTS(rlpath)) {

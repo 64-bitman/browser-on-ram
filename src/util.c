@@ -372,7 +372,8 @@ void create_unique_path(char *buf, size_t buf_size, const char *path)
         errno = prev_errno;
 }
 
-// return true if file/dir is not owned by user and is unreadable or unexecutable
+// return true if file/dir is not owned by user or
+// if owner does not have read + write bits
 bool file_has_bad_perms(const char *path)
 {
         struct stat sb;
@@ -380,7 +381,7 @@ bool file_has_bad_perms(const char *path)
         if (stat(path, &sb) == -1) {
                 return true;
         } else {
-                if (sb.st_uid != getuid() && (sb.st_mode & 0777) < 0755) {
+                if (sb.st_uid != getuid() || (sb.st_mode & 0777) < 0600) {
                         return true;
                 }
         }
