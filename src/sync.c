@@ -17,7 +17,8 @@
 
 static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
 static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
-static int resync_dir(struct Dir *dir, char *backup, char *tmpfs);
+static int resync_dir(struct Dir *dir, char *backup, char *tmpfs,
+                      char *upper_dir, bool overlay);
 
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs);
 static int fix_session(struct Dir *dir, char *backup, char *tmpfs);
@@ -34,7 +35,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
 {
         plog(LOG_INFO, "%sing browser %s", action_str[action], browser->name);
 
-        char backup[PATH_MAX], tmpfs[PATH_MAX];
+        char backup[PATH_MAX], tmpfs[PATH_MAX], otmpfs[PATH_MAX];
 
         for (size_t i = 0; i < browser->dirs_num; i++) {
                 struct Dir *dir = browser->dirs[i];
@@ -47,7 +48,8 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
                 }
 
                 // find required paths
-                if (get_paths(dir, backup, tmpfs) == -1) {
+                if (get_paths(dir, backup, tmpfs) == -1 ||
+                    (overlay && get_overlay_paths(dir, otmpfs))) {
                         plog(LOG_WARN, "failed getting required paths for %s",
                              dir->path);
                         continue;
@@ -68,7 +70,9 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
                 } else if (action == ACTION_UNSYNC) {
                         err = unsync_dir(dir, backup, tmpfs, overlay);
                 } else if (action == ACTION_RESYNC) {
-                        err = resync_dir(dir, backup, tmpfs);
+                        char *upper = (overlay) ? otmpfs : NULL;
+
+                        err = resync_dir(dir, backup, tmpfs, upper, overlay);
                 }
                 if (err == -1) {
                         plog(LOG_WARN, "failed %sing directory %s",
@@ -181,7 +185,8 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
         return 0;
 }
 
-static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
+static int resync_dir(struct Dir *dir, char *backup, char *tmpfs,
+                      char *upper_dir, bool overlay)
 {
         if (!CONFIG.resync_cache && dir->type == DIR_CACHE) {
                 return 0;
@@ -203,6 +208,17 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
                 plog(LOG_ERROR, "failed syncing backup with tmpfs");
                 PERROR();
                 return -1;
+        }
+
+        // clear upper directory
+        if (overlay && upper_dir != NULL) {
+                if (LEXISTS(upper_dir)) {
+                        if (remove_path(upper_dir) == -1) {
+                                plog(LOG_ERROR,
+                                     "failed clearing upper directory");
+                                return -1;
+                        }
+                }
         }
 
         return 0;
@@ -432,8 +448,6 @@ int get_overlay_paths(struct Dir *dir, char *tmpfs)
         return 0;
 }
 
-// vim: sw=8 ts=8
-
 // return true if directory and its parent directory is safe to handle
 static bool directory_is_safe(struct Dir *dir)
 {
@@ -456,3 +470,5 @@ static bool directory_is_safe(struct Dir *dir)
 
         return true;
 }
+
+// vim: sw=8 ts=8
