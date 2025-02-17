@@ -505,7 +505,7 @@ pid_t get_pid(const char *name)
         char exepath[PATH_MAX];
         char rlpath[PATH_MAX];
 
-        while ((ent = readdir(dp)) != NULL) {
+        while (errno = 0, (ent = readdir(dp)) != NULL) {
                 long lpid = atol(ent->d_name);
 
                 snprintf(exepath, PATH_MAX, "/proc/%ld/exe", lpid);
@@ -517,7 +517,6 @@ pid_t get_pid(const char *name)
                         }
                 }
         }
-
         closedir(dp);
         return -1;
 }

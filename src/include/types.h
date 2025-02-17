@@ -11,6 +11,7 @@ enum DirType { DIR_CACHE, DIR_PROFILE };
 
 struct Dir {
         char path[PATH_MAX];
+        char parent_path[PATH_MAX];
         char dirname[NAME_MAX];
         enum DirType type;
         struct Browser *browser;

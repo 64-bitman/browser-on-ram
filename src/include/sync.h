@@ -4,6 +4,8 @@
 
 #include <stdbool.h>
 
+#define BOR_CRASH_PREFIX "bor-crash_"
+
 enum Action { ACTION_NONE, ACTION_SYNC, ACTION_UNSYNC, ACTION_RESYNC };
 static char *action_str[] = { "none", "sync", "unsync", "resync", "status" };
 

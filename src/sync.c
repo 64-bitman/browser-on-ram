@@ -85,7 +85,9 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
         struct stat sb;
 
         if (!DIREXISTS(dir->path)) {
-                plog(LOG_ERROR, "directory %s does not exist", dir->path);
+                plog(LOG_ERROR,
+                     "directory %s does not exist or is already synced",
+                     dir->path);
                 return -1;
         }
 
@@ -366,8 +368,9 @@ static int recover_path(struct Dir *sync_dir, const char *path)
         char time_buf[100];
 
         if (strftime(time_buf, 100, "%d-%m-%y_%H:%M:%S", time_info) != 0) {
-                snprintf(recovery_path, PATH_MAX, "bor-crash_%s/%s_%s",
-                         parent_dir, sync_dir->dirname, time_buf);
+                snprintf(recovery_path, PATH_MAX,
+                         "%s/" BOR_CRASH_PREFIX "%s_%s", parent_dir,
+                         sync_dir->dirname, time_buf);
         } else {
                 plog(LOG_ERROR, "time is empty");
                 free(tmp);
@@ -435,11 +438,6 @@ int get_overlay_paths(struct Dir *dir, char *tmpfs)
 // return true if directory and its parent directory is safe to handle
 static bool directory_is_safe(struct Dir *dir)
 {
-        char buf[PATH_MAX];
-
-        snprintf(buf, PATH_MAX, "%s", dir->path);
-        char *parent = dirname(buf);
-
         struct stat sb;
 
         if (lstat(dir->path, &sb) == 0) {
@@ -448,7 +446,8 @@ static bool directory_is_safe(struct Dir *dir)
                 }
         }
 
-        if (file_has_bad_perms(parent)) {
+        plog(LOG_INFO, "%s", dir->parent_path);
+        if (file_has_bad_perms(dir->parent_path)) {
                 return false;
         }
 

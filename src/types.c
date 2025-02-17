@@ -48,6 +48,7 @@ struct Dir *new_dir(const char *path, enum DirType type,
 
         snprintf(new->path, PATH_MAX, "%s/%s", rlpath, bn);
         snprintf(new->dirname, NAME_MAX, "%s", bn);
+        snprintf(new->parent_path, PATH_MAX, "%s", rlpath);
 
         return new;
 }

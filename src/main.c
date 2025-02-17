@@ -3,8 +3,10 @@
 #include "overlay.h"
 #include "util.h"
 
+#include <dirent.h>
 #include <getopt.h>
 #include <unistd.h>
+#include <glob.h>
 
 #include <limits.h>
 #include <stdbool.h>
@@ -25,8 +27,13 @@ int mount_overlay(void);
 int unmount_overlay(void);
 bool overlay_mounted(void);
 
+int clear_recovery_dirs(void);
+int get_recovery_dirs(struct Dir *target_dir, glob_t *glob_struct);
+
 void print_help(void);
 void print_status(void);
+
+// TODO: implement clean option
 
 int main(int argc, char **argv)
 {
@@ -47,10 +54,10 @@ int main(int argc, char **argv)
         while ((opt = getopt_long(argc, argv, "Vvhsurcp", long_options,
                                   &opt_index)) != -1) {
                 switch (opt) {
-                case 'v':
+                case 'V':
                         LOG_LEVEL = LOG_DEBUG;
                         break;
-                case 'V':
+                case 'v':
                         printf("browser-on-ram version " VERSION "\n");
                         return 0;
                 case 'h':
@@ -66,7 +73,7 @@ int main(int argc, char **argv)
                         action = ACTION_RESYNC;
                         break;
                 case 'c':
-                        return 0;
+                        return (clear_recovery_dirs() == -1) ? 1 : 0;
                 case 'p':
                         status = true;
                         break;
@@ -210,6 +217,69 @@ int uninit(void)
         return 0;
 }
 
+// initializes paths and config itself
+int clear_recovery_dirs(void)
+{
+        if (init(false) == -1) {
+                return -1;
+        }
+
+        for (size_t i = 0; i < CONFIG.browsers_num; i++) {
+                struct Browser *browser = CONFIG.browsers[i];
+
+                plog(LOG_INFO, "clearing browser %s", browser->name);
+
+                for (size_t k = 0; k < browser->dirs_num; k++) {
+                        struct Dir *dir = browser->dirs[k];
+
+                        glob_t gb;
+
+                        if (get_recovery_dirs(dir, &gb) == -1) {
+                                plog(LOG_WARN, "failed getting directories");
+                                continue;
+                        }
+
+                        for (size_t j = 0; j < gb.gl_pathc; j++) {
+                                plog(LOG_INFO, "removing %s", gb.gl_pathv[j]);
+
+                                if (remove_path(gb.gl_pathv[j]) == -1) {
+                                        plog(LOG_ERROR,
+                                             "failed removing recovery directory %s",
+                                             gb.gl_pathv[j]);
+                                        PERROR();
+                                        continue;
+                                }
+                        }
+
+                        globfree(&gb);
+                }
+        }
+        return 0;
+}
+
+// return a list of recovery dirs that belong to target_dir in a glob
+int get_recovery_dirs(struct Dir *target_dir, glob_t *glob_struct)
+{
+        plog(LOG_INFO, "getting recovery dirs for directory %s",
+             target_dir->path);
+
+        // use a glob to get recovery dirs
+        char pattern[PATH_MAX];
+
+        snprintf(pattern, PATH_MAX, "%s/" BOR_CRASH_PREFIX "*",
+                 target_dir->parent_path);
+
+        int err = glob(pattern, GLOB_NOSORT | GLOB_ONLYDIR, NULL, glob_struct);
+
+        if (err != 0 && err != GLOB_NOMATCH) {
+                plog(LOG_ERROR, "failed globbing directories");
+                PERROR();
+                return -1;
+        }
+
+        return 0;
+}
+
 void print_help(void)
 {
         printf("Browser-on-ram " VERSION "\n");
@@ -222,7 +292,7 @@ void print_help(void)
         printf(" -s, --sync                  do sync\n");
         printf(" -u, --unsync                do unsync\n");
         printf(" -r, --resync                do resync\n");
-        /* printf(" -c, --clean                 remove recovery directories\n"); */
+        printf(" -c, --clean                 remove recovery directories\n");
         printf(" -p, --status                show current configuration & state\n");
 
         printf("\nNot recommended to use sync functions directly.\n");
@@ -231,7 +301,9 @@ void print_help(void)
 
 void print_status(void)
 {
-        init(false);
+        if (init(false) == -1) {
+                return;
+        }
 
         printf("Browser-on-ram " VERSION "\n");
 
@@ -271,7 +343,6 @@ void print_status(void)
 
                 printf("Browser: %s\n", browser->name);
 
-                // TODO: unsync fails when browser is running
                 for (size_t k = 0; k < browser->dirs_num; k++) {
                         struct Dir *dir = browser->dirs[k];
 
