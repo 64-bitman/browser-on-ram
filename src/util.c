@@ -584,4 +584,12 @@ bool program_exists(const char *program)
         return false;
 }
 
+// only update str if input is not NULL or empty
+void update_string(char *str, size_t size, const char *input)
+{
+        if (input != NULL && strlen(input) > 0) {
+                snprintf(str, size, "%s", input);
+        }
+}
+
 // vim: sw=8 ts=8

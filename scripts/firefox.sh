@@ -1,9 +1,5 @@
 echo procname = firefox
 
-if [[ -z "$XDG_CACHE_HOME" ]]; then
-    export XDG_CACHE_HOME="$HOME/.cache"
-fi
-
 # https://github.com/graysky2/profile-sync-daemon/blob/master/common/browsers/firefox
 while read -r profileItem; do
     if [[ $(echo "$profileItem" | cut -c1) = "/" ]]; then

@@ -16,6 +16,7 @@ struct Opt {
         enum OptType type;
 };
 
+static int set_environment(void);
 static int parse_config(const char *config_file);
 static int parse_config_handler(void *user, const char *section,
                                 const char *name, const char *value);
@@ -40,38 +41,13 @@ int init_paths(void)
 {
         plog(LOG_DEBUG, "initializing paths");
 
-        char xdg_config_home[PATH_MAX], xdg_runtime_dir[PATH_MAX];
-
-        if (getenv("XDG_CONFIG_HOME") != NULL) {
-                snprintf(xdg_config_home, PATH_MAX, "%s",
-                         getenv("XDG_CONFIG_HOME"));
-        } else {
-                snprintf(xdg_config_home, PATH_MAX, "%s/.config",
-                         getenv("HOME"));
-        }
-        if (getenv("XDG_RUNTIME_DIR") != NULL) {
-                snprintf(xdg_runtime_dir, PATH_MAX, "%s",
-                         getenv("XDG_RUNTIME_DIR"));
-        } else {
-                snprintf(xdg_runtime_dir, PATH_MAX, "/run/user/%d", getuid());
-        }
-        trim(xdg_config_home);
-        trim(xdg_runtime_dir);
-
-        // expand paths to absolute
-        char *rl_config = realpath(xdg_config_home, NULL),
-             *rl_runtime = realpath(xdg_runtime_dir, NULL);
-
-        if (rl_config == NULL || rl_runtime == NULL) {
-                plog(LOG_ERROR, "unable to get absolute paths");
-                free(rl_config);
-                free(rl_runtime);
+        if (set_environment() == -1) {
                 return -1;
         }
 
-        snprintf(PATHS.runtime, PATH_MAX, "%s/bor", rl_runtime);
+        snprintf(PATHS.runtime, PATH_MAX, "%s/bor", getenv("XDG_RUNTIME_DIR"));
         snprintf(PATHS.tmpfs, PATH_MAX, "%s/tmpfs", PATHS.runtime);
-        snprintf(PATHS.config, PATH_MAX, "%s/bor", rl_config);
+        snprintf(PATHS.config, PATH_MAX, "%s/bor", getenv("XDG_CONFIG_HOME"));
         snprintf(PATHS.backups, PATH_MAX, "%s/backups", PATHS.config);
         snprintf(PATHS.share_dir, PATH_MAX, "/usr/share/bor/");
         snprintf(PATHS.share_dir_local, PATH_MAX, "/usr/local/share/bor");
@@ -82,8 +58,33 @@ int init_paths(void)
         plog(LOG_DEBUG, "config dir: %s", PATHS.config);
         plog(LOG_DEBUG, "runtime dir: %s", PATHS.runtime);
 
-        free(rl_config);
-        free(rl_runtime);
+        return 0;
+}
+
+// set the required environment variables
+static int set_environment(void)
+{
+        char xdg_config[PATH_MAX], xdg_cache[PATH_MAX], xdg_run[PATH_MAX];
+
+        snprintf(xdg_config, PATH_MAX, "%s/.config", getenv("HOME"));
+        snprintf(xdg_cache, PATH_MAX, "%s/.cache", getenv("HOME"));
+        snprintf(xdg_run, PATH_MAX, "/run/user/%d", getuid());
+
+        update_string(xdg_config, PATH_MAX, getenv("XDG_CONFIG_HOME"));
+        update_string(xdg_cache, PATH_MAX, getenv("XDG_CACHE_HOME"));
+        update_string(xdg_run, PATH_MAX, getenv("XDG_RUNTIME_DIR"));
+
+        trim(xdg_config);
+        trim(xdg_cache);
+        trim(xdg_run);
+
+        if (setenv("XDG_CONFIG_HOME", xdg_config, true) == -1 ||
+            setenv("XDG_CACHE_HOME", xdg_cache, true) == -1 ||
+            setenv("XDG_RUNTIME_DIR", xdg_run, true) == -1) {
+                plog(LOG_ERROR, "failed setting environment");
+                PERROR();
+                return -1;
+        }
 
         return 0;
 }
