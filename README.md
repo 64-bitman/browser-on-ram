@@ -53,6 +53,9 @@ also start the hourly resync timer `bor-resync.timer`. If you want to resync on
 sleep, then enable run `systemctl enable bor-sleep@$(whoami).service` and
 `systemctl --user enable bor-sleep-resync.service`.
 
+The executable name is `bor`. To see the current status, run `bor --status`. Use
+`bor --help` for additional info.
+
 # Config
 Sample config file, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
 ```ini
