@@ -28,6 +28,7 @@ int unmount_overlay(void);
 bool overlay_mounted(void);
 
 int clear_recovery_dirs(void);
+int remove_glob(glob_t *gb);
 int get_recovery_dirs(struct Dir *target_dir, glob_t *glob_struct);
 
 void print_help(void);
@@ -227,7 +228,7 @@ int clear_recovery_dirs(void)
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {
                 struct Browser *browser = CONFIG.browsers[i];
 
-                plog(LOG_INFO, "clearing browser %s", browser->name);
+                plog(LOG_DEBUG, "clearing browser %s", browser->name);
 
                 for (size_t k = 0; k < browser->dirs_num; k++) {
                         struct Dir *dir = browser->dirs[k];
@@ -238,20 +239,25 @@ int clear_recovery_dirs(void)
                                 plog(LOG_WARN, "failed getting directories");
                                 continue;
                         }
-
-                        for (size_t j = 0; j < gb.gl_pathc; j++) {
-                                plog(LOG_INFO, "removing %s", gb.gl_pathv[j]);
-
-                                if (remove_path(gb.gl_pathv[j]) == -1) {
-                                        plog(LOG_ERROR,
-                                             "failed removing recovery directory %s",
-                                             gb.gl_pathv[j]);
-                                        PERROR();
-                                        continue;
-                                }
-                        }
+                        remove_glob(&gb);
 
                         globfree(&gb);
+                }
+        }
+        return 0;
+}
+
+// remove directories specified in glob struct
+int remove_glob(glob_t *gb)
+{
+        for (size_t j = 0; j < gb->gl_pathc; j++) {
+                plog(LOG_INFO, "removing %s", gb->gl_pathv[j]);
+
+                if (remove_path(gb->gl_pathv[j]) == -1) {
+                        plog(LOG_ERROR, "failed removing recovery directory %s",
+                             gb->gl_pathv[j]);
+                        PERROR();
+                        continue;
                 }
         }
         return 0;
@@ -260,7 +266,7 @@ int clear_recovery_dirs(void)
 // return a list of recovery dirs that belong to target_dir in a glob
 int get_recovery_dirs(struct Dir *target_dir, glob_t *glob_struct)
 {
-        plog(LOG_INFO, "getting recovery dirs for directory %s",
+        plog(LOG_DEBUG, "getting recovery dirs for directory %s",
              target_dir->path);
 
         // use a glob to get recovery dirs
@@ -387,6 +393,18 @@ void print_status(void)
 
                                 free(osize);
                         }
+                        // print recovery dirs
+                        glob_t gb;
+
+                        if (get_recovery_dirs(dir, &gb) == 0) {
+                                for (size_t j = 0; j < gb.gl_pathc; j++) {
+                                        printf("Recovery:          %s\n",
+                                               gb.gl_pathv[j]);
+                                }
+
+                                globfree(&gb);
+                        }
+
                         printf("\n");
                 }
         }
