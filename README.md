@@ -57,20 +57,21 @@ The executable name is `bor`. To see the current status, run `bor --status`. Use
 `bor --help` for additional info.
 
 # Config
-Sample config file, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
+Sample config file with defaults, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
 ```ini
 # <boolean> = true or false
 
 [config]
 # sync cache directories (if the browser has ones)
-enable_cache = <boolean>
+enable_cache = false
 
 # resync them (will be resynced when unsynced however)
-resync_cache = <boolean>
+resync_cache = true
 
 # enable overlay filesystem
-enable_overlay = <boolean>
+enable_overlay = false
 
+# default is no browser
 [browsers]
 mybrowser
 myotherbrowser
