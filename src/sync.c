@@ -446,7 +446,6 @@ static bool directory_is_safe(struct Dir *dir)
                 }
         }
 
-        plog(LOG_INFO, "%s", dir->parent_path);
         if (file_has_bad_perms(dir->parent_path)) {
                 return false;
         }
