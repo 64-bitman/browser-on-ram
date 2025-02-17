@@ -9,4 +9,5 @@ vgcore.*
 !.clang-tidy
 !.clangd
 !.pre-commit-config.yaml
+version.txt
 compile_commands.json

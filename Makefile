@@ -35,6 +35,12 @@ SRC := main.c util.c config.c types.c sync.c overlay.c ini.c teeny-sha1.c
 OBJ := $(addprefix $(OBJ_PATH)/, $(SRC:.c=.o))
 DEPS := $(addprefix $(DEP_PATH)/, $(notdir $(OBJ:.o=.d)))
 
+# set version (https://stackoverflow.com/a/69266365)
+version=$(shell git describe --always --dirty=-dirty)
+$(shell echo ${version} > version.tmp && \
+	{ cmp -s version.tmp version.txt || cp version.tmp version.txt; } && \
+	rm -f version.tmp)
+
 all: prebuild $(TARGET)
 
 prebuild:
@@ -48,6 +54,10 @@ clean:
 
 $(TARGET): $(OBJ)
 	$(CC) $(CFLAGS) -o $@ $^ $(CLIBS)
+
+# so that VERSION macro is changed when git describe has changed
+$(OBJ_PATH)/main.o: $(SRC_PATH)/main.c version.txt
+	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/main.d -o $@ -c $< $(CLIBS)
 
 $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
 	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/$(notdir $(basename $@).d) -o $@ -c $< $(CLIBS)
