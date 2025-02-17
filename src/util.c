@@ -397,8 +397,12 @@ void set_caps(cap_flag_t set, cap_flag_value_t state, size_t count, ...)
 
         va_start(args, count);
 
-        for (size_t i = 0; i < 100 && i < count; i++) {
+        for (size_t i = 0; i < count; i++) {
                 current_cap = va_arg(args, cap_value_t);
+
+                if (!CAP_IS_SUPPORTED(current_cap)) {
+                        goto error;
+                }
 
                 caps[i] = current_cap;
         }
