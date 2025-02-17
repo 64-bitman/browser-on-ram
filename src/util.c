@@ -577,7 +577,8 @@ bool program_exists(const char *program)
 {
         char cmdline[strlen(program) + 100];
 
-        snprintf(cmdline, strlen(program) + 100, "command -v %s", program);
+        snprintf(cmdline, strlen(program) + 100,
+                 "command -v %s > /dev/null 2>&1", program);
 
         int exit = system(cmdline);
 
