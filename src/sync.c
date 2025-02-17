@@ -139,7 +139,7 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
         }
         if (DIREXISTS(tmpfs)) {
                 // sync backup if tmpfs exists
-                plog(LOG_INFO, "copying tmpfs to backup");
+                plog(LOG_DEBUG, "copying tmpfs to backup");
 
                 if (copy_path(tmpfs, backup, false) == -1) {
                         plog(LOG_ERROR,

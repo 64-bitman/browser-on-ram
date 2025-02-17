@@ -81,6 +81,12 @@ int main(int argc, char **argv)
 
         plog(LOG_INFO, "starting browser-on-ram " VERSION);
 
+        // need rsync
+        if (!program_exists("rsync")) {
+                plog(LOG_ERROR, "rsync is required, please install");
+                return 1;
+        }
+
         if (do_action(action) == -1) {
                 plog(LOG_ERROR, "failed sync/unsync/resync");
                 return 1;

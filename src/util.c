@@ -568,4 +568,20 @@ char *human_readable(off_t bytes)
         return str;
 }
 
+// check if program exists in $PATH
+bool program_exists(const char *program)
+{
+        char cmdline[strlen(program) + 100];
+
+        snprintf(cmdline, strlen(program) + 100, "command -v %s", program);
+
+        int exit = system(cmdline);
+
+        if (exit == 0) {
+                return true;
+        }
+
+        return false;
+}
+
 // vim: sw=8 ts=8

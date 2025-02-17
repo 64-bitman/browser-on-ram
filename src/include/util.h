@@ -81,6 +81,7 @@ bool sd_uunit_active(const char *name);
 pid_t get_pid(const char *name);
 off_t get_dir_size(const char *path);
 char *human_readable(off_t bytes);
+bool program_exists(const char *program);
 
 // from teeny-sha1.c
 int sha1digest(uint8_t *digest, char *hexdigest, const uint8_t *data,
