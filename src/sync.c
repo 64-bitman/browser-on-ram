@@ -432,8 +432,6 @@ int get_overlay_paths(struct Dir *dir, char *tmpfs)
         return 0;
 }
 
-// vim: sw=8 ts=8
-
 // return true if directory and its parent directory is safe to handle
 static bool directory_is_safe(struct Dir *dir)
 {
@@ -456,3 +454,5 @@ static bool directory_is_safe(struct Dir *dir)
 
         return true;
 }
+
+// vim: sw=8 ts=8
