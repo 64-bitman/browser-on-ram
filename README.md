@@ -55,7 +55,7 @@ profile = /home/user/.config/mybrowser
 # ... <additional cache/profiles>
 ```
 These should be placed in `$XDG_CONFIG_HOME/bor/scripts`, `/usr/local/share/bor/scripts`, `/usr/share/bor/scripts`. The first one found in that order is
-used.
+used. Please also make a pull request too!
 
 # Config
 Sample config file, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
