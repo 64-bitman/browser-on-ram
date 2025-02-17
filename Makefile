@@ -5,7 +5,7 @@ endif
 CC := gcc
 MACROS := -DINI_STOP_ON_FIRST_ERROR=1 -DINI_ALLOW_NO_VALUE=1 -DVERSION=\"$(shell git describe)\"
 CLIBS := $(shell pkg-config --cflags --libs libcap)
-CFLAGS := -Wextra -Wall -Wshadow -Wcast-align=strict -Wno-format-truncation -std=gnu11 $(CLIBS) $(MACROS)
+CFLAGS := -Wextra -Wall -Wshadow -Wcast-align=strict -Wno-format-truncation -std=gnu11 $(MACROS)
 DEBUG_FLAGS := -ggdb -g3 -DDEBUG -fsanitize=address,undefined -fanalyzer
 REL_FLAGS := -O2
 
@@ -47,10 +47,10 @@ clean:
 	rm -fr build/debug/*/*
 
 $(TARGET): $(OBJ)
-	$(CC) $(CFLAGS) -o $@ $^
+	$(CC) $(CFLAGS) -o $@ $^ $(CLIBS)
 
 $(OBJ_PATH)/%.o: $(SRC_PATH)/%.c
-	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/$(notdir $(basename $@).d) -o $@ -c $<
+	$(CC) $(CFLAGS) -I$(INCLUDE_PATH) -MD -MP -MF $(DEP_PATH)/$(notdir $(basename $@).d) -o $@ -c $< $(CLIBS)
 
 test: all
 	test/start_test
