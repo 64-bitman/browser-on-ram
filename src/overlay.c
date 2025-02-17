@@ -19,6 +19,18 @@ int mount_overlay(void)
                 PERROR();
                 return -1;
         }
+        struct stat sb;
+
+        // I believe symlinks aren't resolved in the data string, but
+        // always better to be save
+        if (SYMEXISTS(PATHS.backups) || SYMEXISTS(PATHS.overlay_upper) ||
+            SYMEXISTS(PATHS.overlay_work)) {
+                plog(LOG_ERROR,
+                     "either the backup directory or upper/work directory is a"
+                     "symlink, cannot proceed");
+                return -1;
+        }
+
         unsigned long mountflags = MS_NOSUID | MS_NODEV | MS_NOATIME;
         char data[PATH_MAX * 2 + 100];
 
