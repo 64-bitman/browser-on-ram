@@ -50,7 +50,7 @@ int main(int argc, char **argv)
 
         int opt, opt_index;
         enum Action action = ACTION_NONE;
-        bool status = false;
+        bool status = false, clean = false;
 
         while ((opt = getopt_long(argc, argv, "Vvhsurcp", long_options,
                                   &opt_index)) != -1) {
@@ -74,7 +74,8 @@ int main(int argc, char **argv)
                         action = ACTION_RESYNC;
                         break;
                 case 'c':
-                        return (clear_recovery_dirs() == -1) ? 1 : 0;
+                        clean = true;
+                        break;
                 case 'p':
                         status = true;
                         break;
@@ -85,6 +86,8 @@ int main(int argc, char **argv)
         if (status) {
                 print_status();
                 return 0;
+        } else if (clean) {
+                return (clear_recovery_dirs() == -1) ? 1 : 0;
         }
 
         plog(LOG_INFO, "starting browser-on-ram " VERSION);
