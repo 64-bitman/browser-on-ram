@@ -30,8 +30,8 @@ void print_status(void);
 
 int main(int argc, char **argv)
 {
-        struct option long_options[] = { { "version", no_argument, NULL, 'V' },
-                                         { "verbose", no_argument, NULL, 'v' },
+        struct option long_options[] = { { "version", no_argument, NULL, 'v' },
+                                         { "verbose", no_argument, NULL, 'V' },
                                          { "help", no_argument, NULL, 'h' },
                                          { "sync", no_argument, NULL, 's' },
                                          { "unsync", no_argument, NULL, 'u' },
@@ -216,14 +216,14 @@ void print_help(void)
         printf("Usage: bor [option]\n\n");
 
         printf("Options:\n");
-        printf("--version               show version\n");
-        printf("--verbose               show debug logs\n");
-        printf("--help                  show this message\n");
-        printf("--sync                  do sync\n");
-        printf("--unsync                do unsync\n");
-        printf("--resync                do resync\n");
-        printf("--clean                 remove recovery directories\n");
-        printf("--status                show current configuration & state\n");
+        printf(" -v, --version               show version\n");
+        printf(" -V, --verbose               show debug logs\n");
+        printf(" -h, --help                  show this message\n");
+        printf(" -s, --sync                  do sync\n");
+        printf(" -u, --unsync                do unsync\n");
+        printf(" -r, --resync                do resync\n");
+        /* printf(" -c, --clean                 remove recovery directories\n"); */
+        printf(" -p, --status                show current configuration & state\n");
 
         printf("\nNot recommended to use sync functions directly.\n");
         printf("Please use the systemd service and timer\n");
