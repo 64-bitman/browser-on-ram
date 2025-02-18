@@ -89,6 +89,9 @@ int main(int argc, char **argv)
         } else if (clean) {
                 return (clear_recovery_dirs() == -1) ? 1 : 0;
         }
+        if (action == ACTION_NONE) {
+                return 0;
+        }
 
         plog(LOG_INFO, "starting browser-on-ram " VERSION);
 
