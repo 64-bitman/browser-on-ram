@@ -34,6 +34,8 @@ rsync
 
 # Install
 
+[AUR package](https://aur.archlinux.org/packages/browser-on-ram-git)
+
 ```sh
 # remove RELEASE=1 for debug builds (which require libasan and libubsan)
 RELEASE=1 make
