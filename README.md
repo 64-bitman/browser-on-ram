@@ -96,8 +96,8 @@ Browser-on-ram uses shell scripts that output the information needed to sync the
 can see existing scripts in this repository for reference in the `scripts` directory. In short they are in the format
 of an ini file, parsed line by line:
 ```sh
-# browser-on-ram will automatically set XDG_CONFIG_HOME and XDG_CACHE_HOME environment variables
-# when calling the script
+# browser-on-ram will automatically set XDG_CONFIG_HOME, XDG_CACHE_HOME, and
+# XDG_DATA_HOME environment variables when calling the script
 
 # process name of the browser
 procname = mybrowser

@@ -64,22 +64,27 @@ int init_paths(void)
 // set the required environment variables
 static int set_environment(void)
 {
-        char xdg_config[PATH_MAX], xdg_cache[PATH_MAX], xdg_run[PATH_MAX];
+        char xdg_config[PATH_MAX], xdg_cache[PATH_MAX], xdg_run[PATH_MAX],
+                xdg_data[PATH_MAX];
 
         snprintf(xdg_config, PATH_MAX, "%s/.config", getenv("HOME"));
         snprintf(xdg_cache, PATH_MAX, "%s/.cache", getenv("HOME"));
         snprintf(xdg_run, PATH_MAX, "/run/user/%d", getuid());
+        snprintf(xdg_data, PATH_MAX, "%s/.local/share", getenv("HOME"));
 
         update_string(xdg_config, PATH_MAX, getenv("XDG_CONFIG_HOME"));
         update_string(xdg_cache, PATH_MAX, getenv("XDG_CACHE_HOME"));
         update_string(xdg_run, PATH_MAX, getenv("XDG_RUNTIME_DIR"));
+        update_string(xdg_data, PATH_MAX, getenv("XDG_DATA_HoME"));
 
         trim(xdg_config);
         trim(xdg_cache);
         trim(xdg_run);
+        trim(xdg_data);
 
         if (setenv("XDG_CONFIG_HOME", xdg_config, true) == -1 ||
             setenv("XDG_CACHE_HOME", xdg_cache, true) == -1 ||
+            setenv("XDG_DATA_HOME", xdg_data, true) == -1 ||
             setenv("XDG_RUNTIME_DIR", xdg_run, true) == -1) {
                 plog(LOG_ERROR, "failed setting environment");
                 PERROR();
