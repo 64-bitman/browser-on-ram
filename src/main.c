@@ -307,8 +307,10 @@ void print_help(void)
         printf(" -c, --clean                 remove recovery directories\n");
         printf(" -p, --status                show current configuration & state\n");
 
+#ifndef NOSYSTEMD
         printf("\nNot recommended to use sync functions directly.\n");
         printf("Please use the systemd service and timer\n");
+#endif
 }
 
 void print_status(void)
@@ -319,14 +321,17 @@ void print_status(void)
 
         printf("Browser-on-ram " VERSION "\n");
 
+        printf("\nStatus:\n");
+#ifndef NOSYSTEMD
         bool service_active = sd_uunit_active("bor.service"),
              timer_active = sd_uunit_active("bor-resync.timer");
 
-        printf("\nStatus:\n");
         printf("Systemd service:         %s\n",
                service_active ? "Active" : "Inactive");
         printf("Systemd resync timer:    %s\n",
                timer_active ? "Active" : "Inactive");
+#endif
+
         printf("Overlay:                 %s\n",
                CONFIG.enable_overlay ? "Enabled" : "Disabled");
 

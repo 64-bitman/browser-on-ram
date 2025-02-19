@@ -472,6 +472,7 @@ error:
         exit(1);
 }
 
+#ifndef NOSYSTEMD
 // check if systemd user unit is active
 bool sd_uunit_active(const char *name)
 {
@@ -492,6 +493,7 @@ bool sd_uunit_active(const char *name)
 
         return false;
 }
+#endif
 
 // returns pid if name is found, else return -1
 pid_t get_pid(const char *name)

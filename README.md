@@ -38,6 +38,7 @@ rsync
 
 ```sh
 # remove RELEASE=1 for debug builds (which require libasan and libubsan)
+# add NOSYSTEMD=1 to not compile systemd integration
 RELEASE=1 make
 
 sudo RELEASE=1 make install

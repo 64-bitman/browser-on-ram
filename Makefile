@@ -19,6 +19,9 @@ else
 	BUILD_DIR := build/$(DEBUG_PREFIX)
 	CFLAGS += $(DEBUG_FLAGS)
 endif
+ifeq ($(NOSYSTEMD), 1)
+	CFLAGS += -DNOSYSTEMD
+endif
 
 
 BIN_PATH := $(BUILD_DIR)/bin
