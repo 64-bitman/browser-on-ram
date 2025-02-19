@@ -115,6 +115,21 @@ profile = /home/user/.config/mybrowser
 These should be placed in `$XDG_CONFIG_HOME/bor/scripts`, `/usr/local/share/bor/scripts`, `/usr/share/bor/scripts` with `.sh` extension.
 The first one found in that order is used. Please also make a pull request too!
 
+# Design
+
+Browser-on-ram first parses the output from the shell script for each browser,
+and gets a list of directories to sync. It then copies each directory to the
+tmpfs, each prefixed with a SHA1 hash of the original path. Then, the directory
+is moved to the backup location and a symlink is created to the tmpfs. The
+reason for a singular location for backups is to allow for one single overlay
+filesystem to store all directories instead of per directory such as PSD.
+
+# Rationale and difference from profile-sync-daemon
+
+Browser-on-ram supports syncing cache directories. Another reason is that is that I was dismayed with the security issues of the overlay
+feature of PSD. I'm not saying browser-on-ram is completely secure, but it shouldn't have any blatant security holes. Addtionally,
+You can also add your own browsers in $XDG_CONFIG_HOME/bor/scripts too.
+
 # Projects Used
 * [inih](https://github.com/benhoyt/inih) - ini format parsing
 * [teeny-sha1](https://github.com/CTrabant/teeny-sha1) - creating hashes for directories
