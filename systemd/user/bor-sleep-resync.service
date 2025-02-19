@@ -2,10 +2,12 @@
 Description=Timed resync
 BindsTo=bor.service
 After=bor.service
+Before=bor-sleep.target
 
 [Service]
 Type=oneshot
 ExecStart=bor --resync --verbose
+Slice=background.slice
 
 [Install]
 WantedBy=bor-sleep.target

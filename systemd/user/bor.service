@@ -8,6 +8,7 @@ Type=oneshot
 RemainAfterExit=yes
 ExecStart=bor --sync --verbose
 ExecStop=bor --unsync --verbose
+Slice=background.slice
 
 [Install]
 WantedBy=default.target

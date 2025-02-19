@@ -6,5 +6,6 @@ After=bor.service
 [Service]
 Type=oneshot
 ExecStart=bor --resync --verbose
+Slice=background.slice
 
 # vim: ft=systemd
