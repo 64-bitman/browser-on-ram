@@ -112,27 +112,31 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                 did_something = true;
         }
 
-        // move dir to backups
-        if (!DIREXISTS(backup)) {
-                if (move_path(dir->path, backup, false) == -1) {
-                        PERROR();
-                        plog(LOG_ERROR, "failed moving dir to backups");
-                        return -1;
-                }
-                did_something = true;
-        }
+        // temporary path to swap with dir
+        char tmp_path[PATH_MAX];
 
-        // create symlink
-        if (!SYMEXISTS(dir->path)) {
-                if (symlink(tmpfs, dir->path) == -1) {
+        create_unique_path(tmp_path, PATH_MAX, dir->path);
+
+        if (DIREXISTS(dir->path) && !LEXISTS(backup)) {
+                // create symlink
+                if (symlink(tmpfs, tmp_path) == -1) {
                         plog(LOG_ERROR, "failed creating symlink");
                         PERROR();
+                        return -1;
+                }
 
-                        // move backup back
-                        if (move_path(backup, dir->path, false) == -1) {
-                                plog(LOG_WARN, "failed moving backup back");
-                                PERROR();
-                        }
+                // swap symlink and dir
+                // we swap atomically in case browser is started mid sync process
+                if (renameat2(AT_FDCWD, tmp_path, AT_FDCWD, dir->path,
+                              RENAME_EXCHANGE) == -1) {
+                        plog(LOG_ERROR, "failed swapping dir and symlink");
+                        PERROR();
+                        return -1;
+                }
+                // move dir (tmp_path) to backup location
+                if (move_path(tmp_path, backup, false) == -1) {
+                        plog(LOG_ERROR, "failed moving dir to backups");
+                        PERROR();
                         return -1;
                 }
                 did_something = true;
