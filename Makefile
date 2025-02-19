@@ -22,6 +22,9 @@ endif
 ifeq ($(NOSYSTEMD), 1)
 	CFLAGS += -DNOSYSTEMD
 endif
+ifeq ($(NOOVERLAY), 1)
+	CFLAGS += -DNOOVERLAY
+endif
 
 
 BIN_PATH := $(BUILD_DIR)/bin

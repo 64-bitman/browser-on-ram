@@ -418,6 +418,7 @@ int get_paths(struct Dir *dir, char *backup, char *tmpfs)
         return 0;
 }
 
+#ifndef NOOVERLAY
 // same as get_paths but only return tmpfs located in upper
 int get_overlay_paths(struct Dir *dir, char *tmpfs)
 {
@@ -437,6 +438,7 @@ int get_overlay_paths(struct Dir *dir, char *tmpfs)
 
         return 0;
 }
+#endif
 
 // return true if directory and its parent directory is safe to handle
 static bool directory_is_safe(struct Dir *dir)

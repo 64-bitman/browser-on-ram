@@ -7,6 +7,8 @@
 #include <sys/statfs.h>
 #include <linux/magic.h>
 
+#ifndef NOOVERLAY
+
 // creates overlay mounted on tmpfs
 // does not check enable_overlay config option or if we have required caps
 int mount_overlay(void)
@@ -110,5 +112,7 @@ bool overlay_mounted(void)
 
         return true;
 }
+
+#endif
 
 // vim: sw=8 ts=8

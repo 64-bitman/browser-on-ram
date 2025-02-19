@@ -125,6 +125,7 @@ int do_action(enum Action action)
         size_t did_action = 0;
         bool overlay = false;
 
+#ifndef NOOVERLAY
         // check if we have required capabilities
         // do it before any action so that unsync/resync
         // works properly in case we don't
@@ -136,6 +137,7 @@ int do_action(enum Action action)
         } else if (CONFIG.enable_overlay) {
                 overlay = true;
         }
+#endif
 
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {
                 struct Browser *browser = CONFIG.browsers[i];
@@ -155,6 +157,8 @@ int do_action(enum Action action)
                 }
                 did_action++;
         }
+
+#ifndef NOOVERLAY
         // we mount after because modifying lowerdir before mount
         // doesn't reflect changes
         if (did_action > 0 && overlay && action == ACTION_SYNC) {
@@ -175,6 +179,7 @@ int do_action(enum Action action)
                 plog(LOG_ERROR, "failed removing overlay");
                 return -1;
         }
+#endif
 
         if (action == ACTION_UNSYNC && uninit() == -1) {
                 plog(LOG_WARN, "failed uninitializing");
@@ -332,6 +337,7 @@ void print_status(void)
                timer_active ? "Active" : "Inactive");
 #endif
 
+#ifndef NOOVERLAY
         printf("Overlay:                 %s\n",
                CONFIG.enable_overlay ? "Enabled" : "Disabled");
 
@@ -344,6 +350,7 @@ void print_status(void)
 
                 free(otosize);
         }
+#endif
         char *tosize = human_readable(get_dir_size(PATHS.tmpfs));
 
         printf("Total size               %s\n", tosize);
@@ -392,6 +399,7 @@ void print_status(void)
                                 printf("Size:              %s\n", size);
                                 free(size);
                         }
+#ifndef NOOVERLAY
                         if (overlay_mounted()) {
                                 if (get_overlay_paths(dir, otmpfs) == -1) {
                                         printf("Error\n");
@@ -404,6 +412,7 @@ void print_status(void)
 
                                 free(osize);
                         }
+#endif
                         // print recovery dirs
                         glob_t gb;
 

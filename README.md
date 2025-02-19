@@ -28,7 +28,7 @@ In brackets are the names to be used in the config file
 
 ```
 gcc
-libcap
+libcap # only if NOOVERLAY=1 is not specified
 rsync
 ```
 
@@ -39,11 +39,12 @@ rsync
 ```sh
 # remove RELEASE=1 for debug builds (which require libasan and libubsan)
 # add NOSYSTEMD=1 to not compile systemd integration
+# add NOOVERLAY=1 to not compile the overlay feature (removes dependency on libcap)
 RELEASE=1 make
 
 sudo RELEASE=1 make install
 
-# enable overlay filesystem capabilities
+# enable overlay filesystem capabilities (if overlay support is compiled)
 sudo make install-cap
 ```
 

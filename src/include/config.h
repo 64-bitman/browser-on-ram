@@ -8,7 +8,9 @@
 #define MAX_BROWSERS 100
 
 struct ConfigSkel {
+#ifndef NOOVERLAY
         bool enable_overlay;
+#endif
         bool enable_cache;
         bool resync_cache;
         struct Browser *browsers[MAX_BROWSERS];
@@ -22,8 +24,11 @@ struct PathsSkel {
         char backups[PATH_MAX];
         char share_dir[PATH_MAX];
         char share_dir_local[PATH_MAX];
+
+#ifndef NOOVERLAY
         char overlay_upper[PATH_MAX];
         char overlay_work[PATH_MAX];
+#endif
 };
 
 extern struct ConfigSkel CONFIG;

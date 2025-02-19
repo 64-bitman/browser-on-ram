@@ -388,6 +388,8 @@ bool file_has_bad_perms(const char *path)
         return false;
 }
 
+#ifndef NOOVERLAY
+
 // set the state of given capabiltiies in set and exit program on failure
 void set_caps(cap_flag_t set, cap_flag_value_t state, size_t count, ...)
 {
@@ -471,6 +473,8 @@ error:
         perror("failed checking capabilities");
         exit(1);
 }
+
+#endif
 
 #ifndef NOSYSTEMD
 // check if systemd user unit is active
