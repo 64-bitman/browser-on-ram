@@ -378,7 +378,7 @@ bool file_has_bad_perms(const char *path)
 {
         struct stat sb;
 
-        if (stat(path, &sb) == -1) {
+        if (lstat(path, &sb) == -1) {
                 return true;
         } else {
                 if (sb.st_uid != getuid() || (sb.st_mode & 0777) < 0600) {
