@@ -24,7 +24,7 @@ int mount_overlay(void)
         struct stat sb;
 
         // I believe symlinks aren't resolved in the data string, but
-        // always better to be save
+        // its always better to be safe
         if (SYMEXISTS(PATHS.backups) || SYMEXISTS(PATHS.overlay_upper) ||
             SYMEXISTS(PATHS.overlay_work)) {
                 plog(LOG_ERROR,
