@@ -603,4 +603,13 @@ void update_string(char *str, size_t size, const char *input)
         }
 }
 
+// check if name is . or ..
+bool name_is_dot(const char *name)
+{
+        if (STR_EQUAL(name, ".") || STR_EQUAL(name, "..")) {
+                return true;
+        }
+        return false;
+}
+
 // vim: sw=8 ts=8

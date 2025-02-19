@@ -31,6 +31,8 @@ int clear_recovery_dirs(void);
 int remove_glob(glob_t *gb);
 int get_recovery_dirs(struct Dir *target_dir, glob_t *glob_struct);
 
+int log_paths(void);
+
 void print_help(void);
 void print_status(void);
 
@@ -181,8 +183,15 @@ int do_action(enum Action action)
         }
 #endif
 
-        if (action == ACTION_UNSYNC && uninit() == -1) {
-                plog(LOG_WARN, "failed uninitializing");
+        if (action == ACTION_UNSYNC) {
+                plog(LOG_INFO, "finding unknown directories or files");
+                if (log_paths()) {
+                        plog(LOG_ERROR, "failed finding unknown paths");
+                        return -1;
+                }
+                if (uninit() == -1) {
+                        plog(LOG_WARN, "failed uninitializing");
+                }
         }
 
         return 0;
@@ -209,12 +218,6 @@ int init(bool save_config)
 int uninit(void)
 {
         struct stat sb;
-
-        // cleanup directories
-        if (DIREXISTS(PATHS.tmpfs) && rmdir(PATHS.tmpfs) == -1) {
-                plog(LOG_WARN, "failed removing %s", PATHS.tmpfs);
-                PERROR();
-        }
 
         // delete temporary config file
         char config_file[PATH_MAX];
@@ -293,6 +296,44 @@ int get_recovery_dirs(struct Dir *target_dir, glob_t *glob_struct)
                 PERROR();
                 return -1;
         }
+
+        return 0;
+}
+
+// log dirs/files in backups and tmpfs
+// should be done after unsync to find unknown directories
+int log_paths(void)
+{
+        DIR *backups_dp = opendir(PATHS.backups);
+        struct dirent *de = NULL;
+
+        if (backups_dp == NULL) {
+                PERROR();
+                return -1;
+        }
+
+        while ((de = readdir(backups_dp)) != NULL) {
+                if (name_is_dot(de->d_name)) {
+                        continue;
+                }
+                plog(LOG_INFO, "found %s/%s", PATHS.backups, de->d_name);
+        }
+        closedir(backups_dp);
+
+        DIR *tmpfs_dp = opendir(PATHS.tmpfs);
+
+        if (tmpfs_dp == NULL) {
+                PERROR();
+                return -1;
+        }
+
+        while ((de = readdir(tmpfs_dp)) != NULL) {
+                if (name_is_dot(de->d_name)) {
+                        continue;
+                }
+                plog(LOG_INFO, "found %s/%s", PATHS.tmpfs, de->d_name);
+        }
+        closedir(tmpfs_dp);
 
         return 0;
 }
