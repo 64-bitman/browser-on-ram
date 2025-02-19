@@ -84,9 +84,12 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
 {
         struct stat sb;
 
+        if (SYMEXISTS(dir->path) && DIREXISTS(tmpfs) && DIREXISTS(backup)) {
+                plog(LOG_INFO, "directory %s is already synced", dir->path);
+                return 0;
+        }
         if (!DIREXISTS(dir->path)) {
-                plog(LOG_ERROR,
-                     "directory %s does not exist or is already synced",
+                plog(LOG_ERROR, "directory %s does not exist or is invalid",
                      dir->path);
                 return -1;
         }
