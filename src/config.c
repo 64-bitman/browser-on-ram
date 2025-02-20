@@ -180,6 +180,11 @@ static int parse_config_handler(void *UNUSED(user), const char *section,
 // for [config] section of config file
 static int section_config_handler(const char *name, const char *value)
 {
+        if (value == NULL) {
+                plog(LOG_ERROR, "key '%s' does not have a value", name);
+                return -1;
+        }
+
         for (size_t i = 0; OPTS[i].type != OPT_END; i++) {
                 if (!STR_EQUAL(OPTS[i].name, name)) {
                         continue;
@@ -320,6 +325,11 @@ static int parse_browser_sh(const char *path, struct Browser *browser)
 static int parse_browser_sh_handler(void *user, const char *UNUSED(section),
                                     const char *name, const char *value)
 {
+        if (value == NULL) {
+                plog(LOG_ERROR, "key '%s' does not have a value", name);
+                return 0;
+        }
+
         struct Browser *browser = user;
 
         if (STR_EQUAL(name, "procname")) {
