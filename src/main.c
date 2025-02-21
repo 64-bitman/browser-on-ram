@@ -36,8 +36,6 @@ int log_paths(void);
 void print_help(void);
 void print_status(void);
 
-// TODO: implement clean option
-
 int main(int argc, char **argv)
 {
         struct option long_options[] = { { "version", no_argument, NULL, 'v' },
