@@ -66,6 +66,7 @@ int trim(char *str);
 int copy_path(const char *src, const char *dest, bool include_root);
 int remove_dir(const char *path);
 int remove_path(const char *path);
+int clear_dir(const char *path);
 
 int move_path(const char *src, const char *dest, bool include_root);
 int replace_paths(const char *target, const char *src);

@@ -26,6 +26,8 @@ static int fix_tmpfs(char *backup, char *tmpfs);
 
 static int recover_path(struct Dir *syncdir, const char *path);
 
+int clear_cache(const char *backup, const char *tmpfs);
+
 static bool directory_is_safe(struct Dir *dir);
 
 // perform action on directories of browser
@@ -50,6 +52,15 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
                 if (get_paths(dir, backup, tmpfs) == -1) {
                         plog(LOG_WARN, "failed getting required paths for %s",
                              dir->path);
+                        continue;
+                }
+
+                // clear cache in tmpfs and backup
+                if (action == ACTION_RMCACHE && dir->type == DIR_CACHE) {
+                        if (clear_cache(backup, tmpfs) == -1) {
+                                plog(LOG_ERROR, "failed clearing cache for %s",
+                                     dir->path);
+                        }
                         continue;
                 }
 
@@ -395,6 +406,32 @@ static int recover_path(struct Dir *sync_dir, const char *path)
                 return -1;
         }
         plog(LOG_INFO, "saved path as %s", unique_path);
+
+        return 0;
+}
+
+int clear_cache(const char *backup, const char *tmpfs)
+{
+        struct stat sb;
+
+        // remove tmpfs first before backup
+        // reverse order seems to break overlay filesystem
+        // (possibly to do with whiteout files?)
+        if (DIREXISTS(tmpfs)) {
+                plog(LOG_INFO, "clearing cache %s", tmpfs);
+                if (clear_dir(tmpfs) == -1) {
+                        PERROR();
+                        return -1;
+                }
+        }
+
+        if (DIREXISTS(backup)) {
+                plog(LOG_INFO, "clearing cache %s", backup);
+                if (clear_dir(backup) == -1) {
+                        PERROR();
+                        return -1;
+                }
+        }
 
         return 0;
 }

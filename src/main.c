@@ -45,6 +45,7 @@ int main(int argc, char **argv)
                                          { "unsync", no_argument, NULL, 'u' },
                                          { "resync", no_argument, NULL, 'r' },
                                          { "clean", no_argument, NULL, 'c' },
+                                         { "rm_cache", no_argument, NULL, 'x' },
                                          { "status", no_argument, NULL, 'p' },
                                          { NULL, 0, NULL, 0 } };
 
@@ -52,7 +53,7 @@ int main(int argc, char **argv)
         enum Action action = ACTION_NONE;
         bool status = false, clean = false;
 
-        while ((opt = getopt_long(argc, argv, "Vvhsurcp", long_options,
+        while ((opt = getopt_long(argc, argv, "Vvhsurcxp", long_options,
                                   &opt_index)) != -1) {
                 switch (opt) {
                 case 'V':
@@ -75,6 +76,9 @@ int main(int argc, char **argv)
                         break;
                 case 'c':
                         clean = true;
+                        break;
+                case 'x':
+                        action = ACTION_RMCACHE;
                         break;
                 case 'p':
                         status = true;
@@ -102,7 +106,7 @@ int main(int argc, char **argv)
         }
 
         if (do_action(action) == -1) {
-                plog(LOG_ERROR, "failed sync/unsync/resync");
+                plog(LOG_ERROR, "received error");
                 return 1;
         }
 
@@ -151,7 +155,7 @@ int do_action(enum Action action)
                 // if a directory or entire browser was not u/r/synced (error)
                 // then skip it and still continue
                 if (do_action_on_browser(browser, action, overlay) == -1) {
-                        plog(LOG_WARN, "failed %sing browser %s",
+                        plog(LOG_WARN, "failed '%s' for browser %s",
                              action_str[action], browser->name);
                         continue;
                 }
@@ -259,15 +263,14 @@ int clear_recovery_dirs(void)
         return 0;
 }
 
-// remove directories specified in glob struct
+// remove files/dirs specified in glob struct
 int remove_glob(glob_t *gb)
 {
-        for (size_t j = 0; j < gb->gl_pathc; j++) {
-                plog(LOG_INFO, "removing %s", gb->gl_pathv[j]);
+        for (size_t i = 0; i < gb->gl_pathc; i++) {
+                plog(LOG_INFO, "removing %s", gb->gl_pathv[i]);
 
-                if (remove_path(gb->gl_pathv[j]) == -1) {
-                        plog(LOG_ERROR, "failed removing recovery directory %s",
-                             gb->gl_pathv[j]);
+                if (remove_path(gb->gl_pathv[i]) == -1) {
+                        plog(LOG_ERROR, "failed removing file/dir");
                         PERROR();
                         continue;
                 }
@@ -349,6 +352,7 @@ void print_help(void)
         printf(" -u, --unsync                do unsync\n");
         printf(" -r, --resync                do resync\n");
         printf(" -c, --clean                 remove recovery directories\n");
+        printf(" -x, --rm_cache              clear cache directories\n");
         printf(" -p, --status                show current configuration & state\n");
 
 #ifndef NOSYSTEMD

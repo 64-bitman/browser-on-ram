@@ -6,6 +6,7 @@
 #include <ftw.h>
 #include <libgen.h>
 #include <unistd.h>
+#include <glob.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -243,7 +244,6 @@ static int remove_dir_handler(const char *fpath, const struct stat *sb,
         } else if (remove(fpath) == -1) {
                 return -1;
         }
-        // anything else is error
 
         return 0;
 }
@@ -281,6 +281,31 @@ int remove_path(const char *path)
                         return -1;
                 }
         }
+        return 0;
+}
+
+// remove dir contents
+int clear_dir(const char *path)
+{
+        glob_t gb;
+
+        char pattern[PATH_MAX];
+
+        snprintf(pattern, PATH_MAX, "%s/*", path);
+
+        int err = glob(pattern, GLOB_NOSORT, NULL, &gb);
+
+        if (err != 0 && err != GLOB_NOMATCH) {
+                globfree(&gb);
+                return -1;
+        }
+
+        for (size_t i = 0; i < gb.gl_pathc; i++) {
+                remove_path(gb.gl_pathv[i]);
+        }
+
+        globfree(&gb);
+
         return 0;
 }
 

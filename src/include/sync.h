@@ -6,8 +6,15 @@
 
 #define BOR_CRASH_PREFIX "bor-crash_"
 
-enum Action { ACTION_NONE, ACTION_SYNC, ACTION_UNSYNC, ACTION_RESYNC };
-static char *action_str[] = { "none", "sync", "unsync", "resync", "status" };
+enum Action {
+        ACTION_NONE,
+        ACTION_SYNC,
+        ACTION_UNSYNC,
+        ACTION_RESYNC,
+        ACTION_RMCACHE
+};
+static char *action_str[] = { "none",   "sync",   "unsync",
+                              "resync", "status", "clear cache" };
 
 int do_action_on_browser(struct Browser *browser, enum Action action,
                          bool overlay);
