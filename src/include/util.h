@@ -35,6 +35,7 @@
 #define IS_DOT(fname) (STR_EQUAL(fname, ".") || STR_EQUAL(fname, ".."))
 
 #define MAX_FD 1024
+#define UNIQUE_PATH_MAX_ITER 1000
 
 #define LOGCWD()                                       \
         do {                                           \

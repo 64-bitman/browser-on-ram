@@ -391,7 +391,7 @@ void create_unique_path(char *buf, size_t buf_size, const char *path)
         if (EXISTS(buf)) {
                 size_t i = 0;
 
-                while (EXISTS(buf)) {
+                while (EXISTS(buf) && i <= UNIQUE_PATH_MAX_ITER) {
                         i++;
                         snprintf(buf, PATH_MAX, "%s-%ld", path, i);
                 }
