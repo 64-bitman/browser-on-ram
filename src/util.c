@@ -301,12 +301,14 @@ int clear_dir(const char *path)
         }
 
         for (size_t i = 0; i < gb.gl_pathc; i++) {
-                remove_path(gb.gl_pathv[i]);
+                if (remove_path(gb.gl_pathv[i]) == -1) {
+                        err = -1;
+                }
         }
 
         globfree(&gb);
 
-        return 0;
+        return err;
 }
 
 // move src to dest inplace via rename (2) if on same filesystem
