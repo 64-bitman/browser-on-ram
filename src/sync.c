@@ -51,7 +51,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
                         continue;
                 }
 
-                // find required paths
+                // get required paths
                 if (get_paths(dir, backup, tmpfs) == -1) {
                         plog(LOG_WARN, "failed getting required paths for %s",
                              dir->path);
@@ -151,6 +151,7 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                 if (renameat2(AT_FDCWD, tmp_path, AT_FDCWD, dir->path,
                               RENAME_EXCHANGE) == -1) {
                         plog(LOG_ERROR, "failed swapping dir and symlink");
+                        unlink(tmp_path);
                         PERROR();
                         return -1;
                 }
@@ -520,6 +521,7 @@ int get_overlay_paths(struct Dir *dir, char *tmpfs)
 #endif
 
 // return true if directory and its parent directory is safe to handle
+// safe means if file/dir is owned by user and if owner has read + write bits
 static bool directory_is_safe(struct Dir *dir)
 {
         struct stat sb;
