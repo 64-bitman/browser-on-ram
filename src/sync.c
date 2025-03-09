@@ -118,7 +118,7 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
         // copy dir to tmpfs if we are not mounted (overlay)
         if (!overlay && !DIREXISTS(tmpfs)) {
                 if (copy_path(dir->path, tmpfs, false) == -1) {
-                        plog(LOG_ERROR, "failed copying dir to tmpfs");
+                        plog(LOG_ERROR, "failed syncing dir to tmpfs");
                         PERROR();
                         return -1;
                 }
@@ -330,10 +330,10 @@ static int fix_backup(char *backup, char *tmpfs)
         // create backup by copying tmpfs
         if (DIREXISTS(tmpfs) && !DIREXISTS(backup)) {
                 plog(LOG_INFO,
-                     "backup not found, copying tmpfs to backup location");
+                     "backup not found, syncing tmpfs to backup location");
 
                 if (copy_path(tmpfs, backup, false) == -1) {
-                        plog(LOG_ERROR, "failed copying tmpfs to backup");
+                        plog(LOG_ERROR, "failed syncing tmpfs to backup");
                         PERROR();
                         return -1;
                 }
@@ -354,10 +354,10 @@ static int fix_tmpfs(char *backup, char *tmpfs, bool overlay)
         // copy backup to tmpfs if it doesn't exist (only if no overlay)
         if (!overlay && DIREXISTS(backup) && !DIREXISTS(tmpfs)) {
                 plog(LOG_INFO,
-                     "tmpfs not found, copying backup to tmpfs location");
+                     "tmpfs not found, syncing backup to tmpfs location");
 
                 if (copy_path(backup, tmpfs, false) == -1) {
-                        plog(LOG_ERROR, "failed copying backup to tmpfs");
+                        plog(LOG_ERROR, "failed syncing backup to tmpfs");
                         PERROR();
                         return -1;
                 }

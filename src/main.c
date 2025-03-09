@@ -180,7 +180,7 @@ int do_action(enum Action action)
 #endif
 
         if (action == ACTION_UNSYNC) {
-                plog(LOG_INFO, "finding unknown directories or files");
+                plog(LOG_INFO, "finding leftover or unknown directories/files");
                 if (log_paths()) {
                         plog(LOG_ERROR, "failed finding unknown paths");
                         return -1;
