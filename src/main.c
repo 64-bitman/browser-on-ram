@@ -146,12 +146,6 @@ int do_action(enum Action action)
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {
                 struct Browser *browser = CONFIG.browsers[i];
 
-                // don't sync if browser is running
-                if (get_pid(browser->procname) != -1 && action == ACTION_SYNC) {
-                        plog(LOG_WARN, "%s is running, skipping",
-                             browser->name);
-                        continue;
-                }
                 // if a directory or entire browser was not u/r/synced (error)
                 // then skip it and still continue
                 if (do_action_on_browser(browser, action, overlay) == -1) {

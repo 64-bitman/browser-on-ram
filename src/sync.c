@@ -136,8 +136,7 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                         return -1;
                 }
 
-                // swap symlink and dir
-                // we swap atomically in case browser is started mid sync process
+                // swap atomically symlink and dir
                 if (renameat2(AT_FDCWD, tmp_path, AT_FDCWD, dir->path,
                               RENAME_EXCHANGE) == -1) {
                         plog(LOG_ERROR, "failed swapping dir and symlink");
@@ -149,6 +148,16 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                         plog(LOG_ERROR, "failed moving dir to backups");
                         PERROR();
                         return -1;
+                }
+                // update tmpfs in case backup was modified after copy,
+                // only if browser is running
+                if (!overlay && get_pid(dir->browser->procname) >= 0) {
+                        if (copy_path(backup, tmpfs, false) == -1) {
+                                plog(LOG_ERROR,
+                                     "failed syncing tmpfs with backup");
+                                PERROR();
+                                return -1;
+                        }
                 }
                 did_something = true;
         }
@@ -190,9 +199,19 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                 PERROR();
                 return -1;
         }
+        // update dir in case tmpfs was modified after copy,
+        // only if browser is running
+        if (DIREXISTS(tmpfs) && get_pid(dir->browser->procname) >= 0) {
+                if (copy_path(tmpfs, dir->path, false) == -1) {
+                        plog(LOG_ERROR, "failed syncing dir with tmpfs");
+                        PERROR();
+                        return -1;
+                }
+        }
+
         // we don't need to remove tmpfs if overlay is mounted
         // because it will disappear after unmount anyways
-        if (!overlay && remove_dir(tmpfs) == -1) {
+        if (!overlay && DIREXISTS(tmpfs) && remove_dir(tmpfs) == -1) {
                 plog(LOG_ERROR, "failed removing tmpfs");
                 PERROR();
                 return -1;
