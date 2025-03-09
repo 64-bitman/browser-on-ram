@@ -19,8 +19,13 @@
 
 #define EXISTS(path) (stat(path, &sb) == 0)
 #define LEXISTS(path) (lstat(path, &sb) == 0)
+
 #define SYMEXISTS(path) (lstat(path, &sb) == 0 && S_ISLNK(sb.st_mode))
+#define EXISTSNOTSYM(path) (lstat(path, &sb) == 0 && !S_ISLNK(sb.st_mode))
+
 #define DIREXISTS(path) (lstat(path, &sb) == 0 && S_ISDIR(sb.st_mode))
+#define EXISTSNOTDIR(path) (lstat(path, &sb) == 0 && !S_ISDIR(sb.st_mode))
+
 #define FEXISTS(path) (lstat(path, &sb) == 0 && S_ISREG(sb.st_mode))
 
 #define STR_EQUAL(str1, str2) (strcmp(str1, str2) == 0)

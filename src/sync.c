@@ -187,7 +187,7 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
         struct stat sb;
         plog(LOG_INFO, "unsyncing directory %s", dir->path);
 
-        if (LEXISTS(dir->path) && !SYMEXISTS(dir->path)) {
+        if (EXISTSNOTSYM(dir->path)) {
                 // not a symlink
                 plog(LOG_INFO, "already unsynced");
                 return 0;
@@ -255,7 +255,7 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
                 return -1;
         }
         // check if backup exists but not a directory
-        if (!DIREXISTS(backup) && LEXISTS(backup)) {
+        if (EXISTSNOTDIR(backup)) {
                 plog(LOG_ERROR, "backup is not a directory");
                 return -1;
         }
@@ -314,8 +314,8 @@ static int fix_session(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                         PERROR();
                         return -1;
                 }
-        } else if (!DIREXISTS(dir->path) && !SYMEXISTS(dir->path) &&
-                   LEXISTS(dir->path)) {
+        } else if (stat(dir->path, &sb) == 0 && !S_ISDIR(sb.st_mode) &&
+                   !S_ISLNK(sb.st_mode)) {
                 // dir is not a directory or symlink
                 plog(LOG_ERROR, "dir is not a directory nor a symlink");
                 return -1;
@@ -356,12 +356,10 @@ static int fix_backup(char *backup, char *tmpfs)
                         PERROR();
                         return -1;
                 }
-        } else if (!DIREXISTS(backup)) {
-                // check if backup is actually a file
-                if (LEXISTS(backup)) {
-                        plog(LOG_ERROR, "backup is a file");
-                        return -1;
-                }
+        } else if (EXISTSNOTDIR(backup)) {
+                // check if backup is not actually a directory
+                plog(LOG_ERROR, "backup is not a directory");
+                return -1;
         }
         return 0;
 }
@@ -380,12 +378,10 @@ static int fix_tmpfs(char *backup, char *tmpfs, bool overlay)
                         PERROR();
                         return -1;
                 }
-        } else if (!DIREXISTS(tmpfs)) {
-                // check if tmpfs is a file
-                if (LEXISTS(tmpfs)) {
-                        plog(LOG_ERROR, "tmpfs is a file");
-                        return -1;
-                }
+        } else if (EXISTSNOTDIR(tmpfs)) {
+                // check if tmpfs is not a directory
+                plog(LOG_ERROR, "tmpfs is not a directory");
+                return -1;
         }
         return 0;
 }
