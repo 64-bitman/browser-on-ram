@@ -139,6 +139,10 @@ int do_action(enum Action action)
                 plog(LOG_WARN, "CAP_SYS_ADMIN and CAP_DAC_OVERRIDE "
                                "is needed for overlay feature");
         } else if (CONFIG.enable_overlay) {
+                if (action == ACTION_SYNC && overlay_mounted()) {
+                        plog(LOG_WARN, "tmpfs is already mounted, aborting");
+                        return -1;
+                }
                 overlay = true;
         }
 #endif
