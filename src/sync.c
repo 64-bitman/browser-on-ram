@@ -195,11 +195,17 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
         if (DIREXISTS(tmpfs)) {
                 // sync backup if tmpfs exists
                 // use dir in overlay upper directory if available
-                char *tmp = (overlay && DIREXISTS(otmpfs)) ? otmpfs : tmpfs;
+                char *tmp = (overlay) ? otmpfs : tmpfs;
+                bool do_sync = true;
 
-                plog(LOG_DEBUG, "syncing tmpfs %s to backup", tmp);
+                // don't sync if upper equivalent doesn't exist (no changes)
+                if (overlay && !DIREXISTS(otmpfs)) {
+                        do_sync = false;
+                } else {
+                        plog(LOG_DEBUG, "syncing tmpfs %s to backup", tmp);
+                }
 
-                if (copy_path(tmp, backup, false) == -1) {
+                if (do_sync && copy_path(tmp, backup, false) == -1) {
                         plog(LOG_ERROR,
                              "failed moving tmpfs back to symlink location");
                         PERROR();
