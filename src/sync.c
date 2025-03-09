@@ -19,10 +19,12 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
 static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
 static int resync_dir(struct Dir *dir, char *backup, char *tmpfs);
 
-static int repair_state(struct Dir *dir, char *backup, char *tmpfs);
-static int fix_session(struct Dir *dir, char *backup, char *tmpfs);
+static int repair_state(struct Dir *dir, char *backup, char *tmpfs,
+                        bool overlay);
+static int fix_session(struct Dir *dir, char *backup, char *tmpfs,
+                       bool overlay);
 static int fix_backup(char *backup, char *tmpfs);
-static int fix_tmpfs(char *backup, char *tmpfs);
+static int fix_tmpfs(char *backup, char *tmpfs, bool overlay);
 
 static int recover_path(struct Dir *syncdir, const char *path);
 
@@ -66,7 +68,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
 
                 // attempt to repair state if previous/current
                 // sync session is corrupted
-                if (repair_state(dir, backup, tmpfs) == -1) {
+                if (repair_state(dir, backup, tmpfs, overlay) == -1) {
                         plog(LOG_WARN,
                              "failed checking state of previous sync session for %s",
                              dir->path);
@@ -250,7 +252,8 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
 // should be run before any action.
 // repairs current session for directory or sends
 // directories that are alone as recovery directories.
-static int repair_state(struct Dir *dir, char *backup, char *tmpfs)
+static int repair_state(struct Dir *dir, char *backup, char *tmpfs,
+                        bool overlay)
 {
         struct stat sb;
 
@@ -264,7 +267,7 @@ static int repair_state(struct Dir *dir, char *backup, char *tmpfs)
                         return -1;
                 }
         }
-        if (fix_session(dir, backup, tmpfs) == -1) {
+        if (fix_session(dir, backup, tmpfs, overlay) == -1) {
                 plog(LOG_ERROR, "failed checking state");
                 return -1;
         }
@@ -273,11 +276,12 @@ static int repair_state(struct Dir *dir, char *backup, char *tmpfs)
 }
 
 // attempt to fix session if the at least one directory exists.
-static int fix_session(struct Dir *dir, char *backup, char *tmpfs)
+static int fix_session(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
 {
         struct stat sb;
 
-        if (fix_backup(backup, tmpfs) == -1 || fix_tmpfs(backup, tmpfs) == -1) {
+        if (fix_backup(backup, tmpfs) == -1 ||
+            fix_tmpfs(backup, tmpfs, overlay) == -1) {
                 plog(LOG_ERROR, "failed fixing directories");
                 return -1;
         }
@@ -343,12 +347,12 @@ static int fix_backup(char *backup, char *tmpfs)
         return 0;
 }
 
-static int fix_tmpfs(char *backup, char *tmpfs)
+static int fix_tmpfs(char *backup, char *tmpfs, bool overlay)
 {
         struct stat sb;
 
-        // copy backup to tmpfs if it doesn't exist
-        if (DIREXISTS(backup) && !DIREXISTS(tmpfs)) {
+        // copy backup to tmpfs if it doesn't exist (only if no overlay)
+        if (!overlay && DIREXISTS(backup) && !DIREXISTS(tmpfs)) {
                 plog(LOG_INFO,
                      "tmpfs not found, copying backup to tmpfs location");
 
