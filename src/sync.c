@@ -16,7 +16,8 @@
 #include <stdbool.h>
 
 static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
-static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
+static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
+                      bool overlay);
 static int resync_dir(struct Dir *dir, char *backup, char *tmpfs);
 
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs,
@@ -38,7 +39,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
 {
         plog(LOG_INFO, "%sing browser %s", action_str[action], browser->name);
 
-        char backup[PATH_MAX], tmpfs[PATH_MAX];
+        char backup[PATH_MAX], tmpfs[PATH_MAX], otmpfs[PATH_MAX];
 
         for (size_t i = 0; i < browser->dirs_num; i++) {
                 struct Dir *dir = browser->dirs[i];
@@ -56,6 +57,14 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
                              dir->path);
                         continue;
                 }
+#ifndef NOOVERLAY
+                if ((action == ACTION_UNSYNC || action == ACTION_RESYNC) &&
+                    overlay && get_overlay_paths(dir, otmpfs) == -1) {
+                        plog(LOG_WARN, "failed getting overlay path for %s",
+                             dir->path);
+                        continue;
+                }
+#endif
 
                 // clear cache in tmpfs and backup
                 if (action == ACTION_RMCACHE && dir->type == DIR_CACHE) {
@@ -79,7 +88,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
                 if (action == ACTION_SYNC) {
                         err = sync_dir(dir, backup, tmpfs, overlay);
                 } else if (action == ACTION_UNSYNC) {
-                        err = unsync_dir(dir, backup, tmpfs, overlay);
+                        err = unsync_dir(dir, backup, tmpfs, otmpfs, overlay);
                 } else if (action == ACTION_RESYNC) {
                         err = resync_dir(dir, backup, tmpfs);
                 }
@@ -172,7 +181,8 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
 }
 
 // automatically resyncs directory
-static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
+static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
+                      bool overlay)
 {
         struct stat sb;
         plog(LOG_INFO, "unsyncing directory %s", dir->path);
@@ -184,9 +194,12 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
         }
         if (DIREXISTS(tmpfs)) {
                 // sync backup if tmpfs exists
-                plog(LOG_DEBUG, "copying tmpfs to backup");
+                // use dir in overlay upper directory if available
+                char *tmp = (overlay && DIREXISTS(otmpfs)) ? otmpfs : tmpfs;
 
-                if (copy_path(tmpfs, backup, false) == -1) {
+                plog(LOG_DEBUG, "syncing tmpfs %s to backup", tmp);
+
+                if (copy_path(tmp, backup, false) == -1) {
                         plog(LOG_ERROR,
                              "failed moving tmpfs back to symlink location");
                         PERROR();

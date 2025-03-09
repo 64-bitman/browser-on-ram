@@ -4,8 +4,6 @@
 #include <sys/capability.h>
 #include <sys/mount.h>
 #include <unistd.h>
-#include <sys/statfs.h>
-#include <linux/magic.h>
 
 #ifndef NOOVERLAY
 
@@ -104,7 +102,7 @@ bool overlay_mounted(void)
                 return false;
         }
 
-        // check if runtime and tmpfs is on different devices
+        // check if runtime and tmpfs are on different devices
         if (sb.st_dev == sb2.st_dev) {
                 // same filesystem
                 return false;
