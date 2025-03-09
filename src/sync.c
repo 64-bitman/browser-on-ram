@@ -18,7 +18,8 @@
 static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay);
 static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
                       bool overlay);
-static int resync_dir(struct Dir *dir, char *backup, char *tmpfs);
+static int resync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
+                      bool overlay);
 
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs,
                         bool overlay);
@@ -90,7 +91,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
                 } else if (action == ACTION_UNSYNC) {
                         err = unsync_dir(dir, backup, tmpfs, otmpfs, overlay);
                 } else if (action == ACTION_RESYNC) {
-                        err = resync_dir(dir, backup, tmpfs);
+                        err = resync_dir(dir, backup, tmpfs, otmpfs, overlay);
                 }
                 if (err == -1) {
                         plog(LOG_WARN, "failed %sing directory %s",
@@ -195,21 +196,8 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
         }
         if (DIREXISTS(tmpfs)) {
                 // sync backup if tmpfs exists
-                // use dir in overlay upper directory if available
-                char *tmp = (overlay) ? otmpfs : tmpfs;
-                bool do_sync = true;
-
-                // don't sync if upper equivalent doesn't exist (no changes)
-                if (overlay && !DIREXISTS(otmpfs)) {
-                        do_sync = false;
-                } else {
-                        plog(LOG_DEBUG, "syncing tmpfs %s to backup", tmp);
-                }
-
-                if (do_sync && copy_path(tmp, backup, false) == -1) {
-                        plog(LOG_ERROR,
-                             "failed moving tmpfs back to symlink location");
-                        PERROR();
+                if (resync_dir(dir, backup, tmpfs, otmpfs, overlay) == -1) {
+                        plog(LOG_ERROR, "failed resyncing");
                         return -1;
                 }
         } else if (!DIREXISTS(backup)) {
@@ -242,7 +230,8 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
         return 0;
 }
 
-static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
+static int resync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
+                      bool overlay)
 {
         if (!CONFIG.resync_cache && dir->type == DIR_CACHE) {
                 return 0;
@@ -251,17 +240,27 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs)
         struct stat sb;
 
         plog(LOG_INFO, "resyncing directory %s", dir->path);
+
         if (!DIREXISTS(tmpfs)) {
-                plog(LOG_ERROR, "tmpfs does not exist");
+                plog(LOG_ERROR, "%s does not exist", tmpfs);
                 return -1;
         }
         // check if backup exists but not a directory
         if (EXISTSNOTDIR(backup)) {
-                plog(LOG_ERROR, "backup is not a directory");
+                plog(LOG_ERROR, "%s is not a directory", backup);
                 return -1;
         }
-        if (copy_path(tmpfs, backup, false) == -1) {
-                plog(LOG_ERROR, "failed syncing backup with tmpfs");
+        char *tmp = (overlay) ? otmpfs : tmpfs;
+        bool do_sync = true;
+
+        if (overlay && !DIREXISTS(otmpfs)) {
+                do_sync = false;
+        } else {
+                plog(LOG_DEBUG, "syncing tmpfs %s to backup", tmp);
+        }
+
+        if (do_sync && copy_path(tmp, backup, false) == -1) {
+                plog(LOG_ERROR, "failed syncing %s with %s", tmpfs, backup);
                 PERROR();
                 return -1;
         }
