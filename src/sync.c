@@ -135,12 +135,12 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                 did_something = true;
         }
 
-        // temporary path to swap with dir
-        char tmp_path[PATH_MAX];
-
-        create_unique_path(tmp_path, PATH_MAX, dir->path);
-
         if (DIREXISTS(dir->path) && !LEXISTS(backup)) {
+                // temporary path to swap with dir
+                char tmp_path[PATH_MAX];
+
+                create_unique_path(tmp_path, PATH_MAX, dir->path);
+
                 // create symlink
                 if (symlink(tmpfs, tmp_path) == -1) {
                         plog(LOG_ERROR, "failed creating symlink");
