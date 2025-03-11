@@ -275,7 +275,7 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
 
 #ifndef NOOVERLAY
 // remount overlay in order to clear upper dir in an atomic way
-// a normal resync should be done after this this
+// a normal resync should be done before this this
 int reset_overlay(void)
 {
         plog(LOG_INFO, "resetting overlay");

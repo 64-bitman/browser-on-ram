@@ -145,13 +145,6 @@ int do_action(enum Action action)
                 }
                 overlay = true;
         }
-
-        if (action == ACTION_RESYNC && overlay && CONFIG.reset_overlay) {
-                if (reset_overlay() == -1) {
-                        plog(LOG_ERROR, "failed resetting overlay");
-                        return -1;
-                }
-        }
 #endif
 
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {
@@ -168,6 +161,14 @@ int do_action(enum Action action)
         }
 
 #ifndef NOOVERLAY
+        // reset overlay if configured
+        if (action == ACTION_RESYNC && overlay && CONFIG.reset_overlay) {
+                if (reset_overlay() == -1) {
+                        plog(LOG_ERROR, "failed resetting overlay");
+                        return -1;
+                }
+        }
+
         // we mount after because modifying lowerdir before mount
         // doesn't reflect changes
         if (did_action > 0 && overlay && action == ACTION_SYNC) {
