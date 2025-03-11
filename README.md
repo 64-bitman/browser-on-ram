@@ -77,7 +77,7 @@ resync_cache = true
 enable_overlay = false
 
 # when resyncing, remount the overlay in order to clear the upper directory
-(where changes are stored on the tmpfs)
+# (where changes are stored on the tmpfs)
 reset_overlay = false
 
 # default is no browser
