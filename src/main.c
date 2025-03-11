@@ -145,6 +145,13 @@ int do_action(enum Action action)
                 }
                 overlay = true;
         }
+
+        if (action == ACTION_RESYNC && overlay && CONFIG.reset_overlay) {
+                if (reset_overlay() == -1) {
+                        plog(LOG_ERROR, "failed resetting overlay");
+                        return -1;
+                }
+        }
 #endif
 
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {

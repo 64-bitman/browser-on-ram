@@ -36,6 +36,7 @@ static struct Opt OPTS[] = {
 #endif
         { "enable_cache", &CONFIG.enable_cache, OPT_BOOL },
         { "resync_cache", &CONFIG.resync_cache, OPT_BOOL },
+        { "reset_overlay", &CONFIG.reset_overlay, OPT_BOOL},
         { NULL, NULL, OPT_END }
 };
 
@@ -112,6 +113,7 @@ int init_config(bool save_config)
 #endif
         CONFIG.enable_cache = false;
         CONFIG.resync_cache = true;
+        CONFIG.reset_overlay = false;
 
         char borconf[PATH_MAX], dotborconf[PATH_MAX];
 

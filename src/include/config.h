@@ -13,6 +13,7 @@ struct ConfigSkel {
 #endif
         bool enable_cache;
         bool resync_cache;
+        bool reset_overlay;
         struct Browser *browsers[MAX_BROWSERS];
         size_t browsers_num;
 };

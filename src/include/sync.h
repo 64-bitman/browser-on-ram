@@ -18,6 +18,9 @@ static char *action_str[] = { "none",   "sync",   "unsync",
 
 int do_action_on_browser(struct Browser *browser, enum Action action,
                          bool overlay);
+#ifndef NOOVERLAY
+int reset_overlay(void);
+#endif
 int get_paths(struct Dir *dir, char *backup, char *tmpfs);
 int get_overlay_paths(struct Dir *dir, char *tmpfs);
 

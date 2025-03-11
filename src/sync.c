@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "sync.h"
+#include "overlay.h"
 #include "types.h"
 #include "util.h"
 #include "config.h"
@@ -20,6 +21,10 @@ static int unsync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
                       bool overlay);
 static int resync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
                       bool overlay);
+
+#ifndef NOOVERLAY
+static int repoint_dirs(const char *target);
+#endif
 
 static int repair_state(struct Dir *dir, char *backup, char *tmpfs,
                         bool overlay);
@@ -267,6 +272,105 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
 
         return 0;
 }
+
+#ifndef NOOVERLAY
+// remount overlay in order to clear upper dir in an atomic way
+// a normal resync should be done after this this
+int reset_overlay(void)
+{
+        plog(LOG_INFO, "resetting overlay");
+
+        if (repoint_dirs("backup") == -1) {
+                plog(LOG_ERROR,
+                     "failed repointing symlinks to respective backups");
+                return -1;
+        }
+
+        if (unmount_overlay() == -1) {
+                plog(LOG_ERROR, "failed unmounting directory");
+                return -1;
+        }
+
+        if (mount_overlay() == -1) {
+                plog(LOG_ERROR, "failed mounting directory");
+                return -1;
+        }
+
+        if (repoint_dirs("tmpfs") == -1) {
+                plog(LOG_ERROR,
+                     "failed repointing symlinks to respective tmpfs'");
+                return -1;
+        }
+
+        return 0;
+}
+
+// make all directory symlinks point to backup or tmpfs in an atomic way
+static int repoint_dirs(const char *target)
+{
+        struct stat sb;
+
+        char backup[PATH_MAX], tmpfs[PATH_MAX];
+        const char *path = (strcmp(target, "tmpfs") == 0)  ? tmpfs :
+                           (strcmp(target, "backup") == 0) ? backup :
+                                                             NULL;
+
+        if (path == NULL) {
+                return -1;
+        }
+
+        for (size_t i = 0; i < CONFIG.browsers_num; i++) {
+                struct Browser *browser = CONFIG.browsers[i];
+
+                for (size_t k = 0; k < browser->dirs_num; k++) {
+                        struct Dir *dir = browser->dirs[k];
+
+                        // skip if path doesn't exist or is not a symlink
+                        if (!LEXISTS(dir->path) || !S_ISLNK(sb.st_mode)) {
+                                plog(LOG_WARN , "not resyncing directory %s",
+                                     dir->path);
+                                continue;
+                        }
+                        if (get_paths(dir, backup, tmpfs) == -1) {
+                                plog(LOG_WARN,
+                                     "failed getting required paths for %s",
+                                     dir->path);
+                                continue;
+                        }
+
+                        char tmp_path[PATH_MAX];
+
+                        create_unique_path(tmp_path, PATH_MAX, dir->path);
+
+                        // create symlink
+                        if (symlink(path, tmp_path) == -1) {
+                                plog(LOG_WARN, "failed creating symlink %s", tmp_path);
+                                PERROR();
+                                continue;
+                        }
+
+                        // swap atomically symlink and new symlink
+                        if (renameat2(AT_FDCWD, tmp_path, AT_FDCWD, dir->path,
+                                      RENAME_EXCHANGE) == -1) {
+                                plog(LOG_WARN,
+                                     "failed swapping dir and symlink for %s", dir->path);
+                                unlink(tmp_path);
+                                PERROR();
+                                continue;
+                        }
+
+                        // remove old symlink
+                        if (unlink(tmp_path) == -1) {
+                                plog(LOG_WARN, "failed removing %s", tmp_path);
+                                PERROR();
+                                continue;
+                        }
+                }
+        }
+
+        return 0;
+}
+#endif
 
 // should be run before any action.
 // repairs current session for directory or sends
