@@ -1,6 +1,5 @@
 [Unit]
 Description=Timed resync
-After=bor.service
 
 [Service]
 Type=oneshot
