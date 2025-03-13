@@ -1,5 +1,8 @@
 [Unit]
 Description=Timed resync
+After=bor.service
+Wants=bor-resync.timer
+BindsTo=bor.service
 
 [Service]
 Type=oneshot

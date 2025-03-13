@@ -4,5 +4,6 @@ BindsTo=bor.service
 
 [Timer]
 OnActiveSec=1h
+OnUnitActiveSec=1h
 
 # vim: ft=systemd
