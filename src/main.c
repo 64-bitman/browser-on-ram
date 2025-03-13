@@ -106,7 +106,8 @@ int main(int argc, char **argv)
         }
 
         if (do_action(action) == -1) {
-                plog(LOG_ERROR, "received error");
+                plog(LOG_ERROR, "failed attempting to do %s",
+                     action_str[action]);
                 return 1;
         }
 
