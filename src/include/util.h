@@ -37,6 +37,8 @@
 #define MAX_FD 1024
 #define UNIQUE_PATH_MAX_ITER 1000
 
+#define MIB 1024
+
 #define LOGCWD()                                       \
         do {                                           \
                 char logcwd_cwd[PATH_MAX];             \

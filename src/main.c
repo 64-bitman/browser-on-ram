@@ -10,6 +10,7 @@
 
 #include <limits.h>
 #include <stdbool.h>
+#include <sys/statvfs.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -23,9 +24,7 @@ int do_action(enum Action action);
 int init(bool save_config);
 int uninit(void);
 
-int mount_overlay(void);
-int unmount_overlay(void);
-bool overlay_mounted(void);
+int check_runtime_space(void);
 
 int clear_recovery_dirs(void);
 int remove_glob(glob_t *gb);
@@ -146,6 +145,13 @@ int do_action(enum Action action)
                 }
                 overlay = true;
         }
+
+        // check if there is enough free space
+        if (action == ACTION_SYNC && !overlay && check_runtime_space() == -1) {
+                plog(LOG_ERROR, "not enough runtime free space, aborting");
+                return -1;
+        }
+        check_runtime_space();
 #endif
 
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {
@@ -237,6 +243,49 @@ int uninit(void)
         if (FEXISTS(config_file) && unlink(config_file) == -1) {
                 plog(LOG_WARN, "failed removing .bor.conf");
                 PERROR();
+        }
+
+        return 0;
+}
+
+// return -1 if there is not enough space in the runtime/tmpfs directory
+// only should be run if overlay is not enabled
+int check_runtime_space(void)
+{
+        // get total size of dirs
+        struct stat sb;
+        off_t size = 0;
+
+        for (size_t i = 0; i < CONFIG.browsers_num; i++) {
+                struct Browser *browser = CONFIG.browsers[i];
+
+                for (size_t k = 0; k < browser->dirs_num; k++) {
+                        struct Dir *dir = browser->dirs[k];
+
+                        if (lstat(dir->path, &sb) == -1 ||
+                            !S_ISDIR(sb.st_mode)) {
+                                plog(LOG_WARN,
+                                     "failed getting info about directory %s",
+                                     dir->path);
+                                continue;
+                        }
+
+                        size += get_dir_size(dir->path);
+                }
+        }
+        struct statvfs svfsb;
+
+        // get runtime max size
+        if (statvfs(PATHS.runtime, &svfsb) == -1) {
+                plog(LOG_ERROR, "failed getting info about runtime directory");
+                return -1;
+        }
+
+        // check if at least 100 MIB of free space will remain after
+        if ((off_t)(svfsb.f_bsize * svfsb.f_bavail - 100 * MIB) <= size) {
+                plog(LOG_ERROR,
+                     "not enough space in runtime directory to be safe");
+                return -1;
         }
 
         return 0;
