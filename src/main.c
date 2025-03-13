@@ -162,7 +162,8 @@ int do_action(enum Action action)
 
 #ifndef NOOVERLAY
         // reset overlay if configured
-        if (action == ACTION_RESYNC && overlay && CONFIG.reset_overlay) {
+        if (action == ACTION_RESYNC && overlay && did_action > 0 &&
+            CONFIG.reset_overlay) {
                 if (reset_overlay() == -1) {
                         plog(LOG_ERROR, "failed resetting overlay");
                         return -1;

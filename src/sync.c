@@ -278,7 +278,13 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
 // a normal resync should be done before this this
 int reset_overlay(void)
 {
+
         plog(LOG_INFO, "resetting overlay");
+
+        if (!overlay_mounted()) {
+                plog(LOG_WARN, "overlay not mounted");
+                return -1;
+        }
 
         if (repoint_dirs("backup") == -1) {
                 plog(LOG_ERROR,
