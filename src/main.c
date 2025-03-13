@@ -151,7 +151,6 @@ int do_action(enum Action action)
                 plog(LOG_ERROR, "not enough runtime free space, aborting");
                 return -1;
         }
-        check_runtime_space();
 #endif
 
         for (size_t i = 0; i < CONFIG.browsers_num; i++) {
@@ -275,7 +274,6 @@ int check_runtime_space(void)
         }
         struct statvfs svfsb;
 
-        // get runtime max size
         if (statvfs(PATHS.runtime, &svfsb) == -1) {
                 plog(LOG_ERROR, "failed getting info about runtime directory");
                 return -1;
