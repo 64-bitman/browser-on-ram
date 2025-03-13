@@ -1,9 +1,12 @@
 #include "overlay.h"
 #include "config.h"
 #include "util.h"
+
 #include <sys/capability.h>
 #include <sys/mount.h>
 #include <unistd.h>
+#include <sys/vfs.h>
+#include <linux/magic.h>
 
 #ifndef NOOVERLAY
 
@@ -106,6 +109,17 @@ bool overlay_mounted(void)
         if (sb.st_dev == sb2.st_dev) {
                 // same filesystem
                 return false;
+        }
+        struct statfs sfsb;
+
+        if (statfs(PATHS.tmpfs, &sfsb) == -1) {
+                plog(LOG_WARN, "failed getting info about tmpfs");
+                return true;
+        }
+        // warn if overlay is not actually an overlay mount
+        if (sfsb.f_type != OVERLAYFS_SUPER_MAGIC) {
+                plog(LOG_WARN, "tmpfs is mounted on a different filesytem "
+                               "which is not an overlay filesystem");
         }
 
         return true;
