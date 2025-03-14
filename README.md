@@ -52,10 +52,9 @@ sudo make install-cap
 # Usage
 
 The recommended way is to use the systemd service, you can enable it it via
-`systemctl --user enable --now bor.service`, note that any configured browsers
-that are running will not be synced (you should close them first). This will
-also start the hourly resync timer `bor-resync.timer`. If you want to resync on
-sleep, then enable run `systemctl enable bor-sleep@$(whoami).service` and
+`systemctl --user enable --now bor.service`. This will also start the hourly
+resync timer `bor-resync.timer`. If you want to resync on sleep,
+then enable run `systemctl enable bor-sleep@$(whoami).service` and
 `systemctl --user enable bor-sleep-resync.service`.
 
 The executable name is `bor`. To see the current status, run `bor --status`. Use
