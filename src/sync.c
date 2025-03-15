@@ -47,6 +47,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
              browser->name);
 
         char backup[PATH_MAX], tmpfs[PATH_MAX], otmpfs[PATH_MAX];
+        int did_something = 0;
 
         for (size_t i = 0; i < browser->dirs_num; i++) {
                 struct Dir *dir = browser->dirs[i];
@@ -102,10 +103,12 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
                 if (err == -1) {
                         plog(LOG_WARN, "failed %sing directory %s",
                              action_str[action], dir->path);
+                        continue;
                 }
+                did_something++;
         }
 
-        return 0;
+        return (did_something > 0) ? 0 : -1;
 }
 
 // if overlay is true then don't copy to tmpfs
