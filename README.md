@@ -8,7 +8,7 @@
 # Warning
 
 RAM is not persistent! You may lose up to an hour of browsing usage data with the automatic resync timer if your system suddenly exits/crashes.
-Additionally, before using this program for the first time, make sure to backup your data! I believe this software to
+Moreover, before using this program for the first time, make sure to backup your data! I believe this software to
 be stable in terms of not randomly wiping your data, and have included safety/integrity checks & repairs, but it's
 always better to be safe. Additionally, make sure you have enough space in your
 runtime directory before running, depending on how big your browser directories are.
@@ -94,9 +94,10 @@ myotherbrowser
 
 Browser-on-ram can mount your data on an overlay filesystem, which can significantly reduce memory usage, as only
 changed data needs to be stored on RAM. To do this, it uses Linux capabilities (specifically SYS_ADMIN_CAP and
-SYS_DAC_OVERRIDE), which are unfortunately very broad (But I supposed better than setuid). By default they are in permitted mode (doesn't actually affect the program),
-and are only raised to effective mode when mounting the overlay filesystem and deleting the root owned work directory needed by the
-overlay filesystem. If anything related to interacting with capabilties fails, the program immediately exits.
+SYS_DAC_OVERRIDE), which are unfortunately very broad (But I supposed better than setuid). By default they are
+in permitted mode (doesn't actually affect the program), and are only raised to effective mode when mounting the
+overlay filesystem and deleting the root owned work directory needed by the overlay filesystem on unsync.
+If anything related to interacting with capabilties fails, the program immediately exits.
 
 #
 
