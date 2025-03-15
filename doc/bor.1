@@ -1,0 +1,153 @@
+.TH bor 1
+.SH NAME
+Browser\-on\-ram (bor) \- Sync browser related directories to RAM for Linux
+.SH SYNOPSIS
+.B bor [\fIoption\fR] ...
+.SH DESCRIPTION
+Browser-on-ram is a program that syncs browser related directories to RAM.  The benefits of this includes:
+.RS
+.IP \(bu 3
+Speeds up browser
+.IP \(bu 3
+Reduces disk writes
+.IP \(bu 3
+Automatically backs up data
+.IP \(bu 3
+Supports mounting data with an overlay filesystem for reduced memory usage
+.RE
+.SH WARNING
+RAM is not persistent! You may lose up to an hour of browsing usage data with the automatic resync timer if your system suddenly exits/crashes.
+Moreover, before using this program for the first time, make sure to backup your data! Additionally, make sure you have enough space in your
+runtime directory before running, depending on how
+big your browser directories are.
+.SH USAGE
+The recommended way is to use the systemd service, you can enable it it via \fBsystemctl --user enable --now bor.service\fR. This will also start the hourly
+resync timer \fIbor-resync.timer\fR. If you want to resync on sleep, then enable run \fBsystemctl enable bor-sleep@$(whoami).service\fR and \fBsystemctl
+--user enable bor-sleep-resync.service\fR. The executable name is \fIbor\fR. To see the current status, run \fBbor --status\fR. Use \fBbor --help\fR for additional info.
+.SH OPTIONS
+.TP
+.BR \-v ", " \-\-version
+show version
+.TP
+.BR \-V ", " \-\-verbose
+show debug logs
+.TP
+.BR \-h ", " \-\-help
+show help message
+.TP
+.BR \-s ", " \-\-sync
+synchronize all browsers to RAM
+.TP
+.BR \-u ", " \-\-unsync
+unsynchronize all browsers to RAM
+.TP
+.BR \-r ", " \-\-resync
+resynchronize all browsers to RAM
+.TP
+.BR \-c ", " \-\-clean
+remove detected recovery directories (from previous sessions)
+.TP
+.BR \-x ", " \-\-rm_cache
+clear cache directories
+.TP
+.BR \-p ", " \-\-status
+show current configuration and state
+
+.SH CONFIG
+Sample config file with defaults, in ini format (in $XDG_CACHE_HOME/bor/bor.conf):
+
+.RS
+.ft CR
+.nf
+.eo
+# <boolean> = true or false
+
+[config]
+# sync cache directories (if the browser has ones)
+enable_cache = false
+
+# resync them (will be resynced when unsynced however)
+resync_cache = true
+
+# enable overlay filesystem
+enable_overlay = false
+
+# when resyncing, remount the overlay in order to clear the upper directory
+# (where changes are stored on the tmpfs)
+reset_overlay = false
+
+# maximum number of log entries to store in log file
+# (0 to disable logging to a file and a negative number for infinite entries)
+max_log_entires = 10
+
+# default is no browser
+[browsers]
+mybrowser
+myotherbrowser
+# ...
+.ec
+.fi
+.ft R
+.RE
+.SH SUPPORTED BROWSERS
+List of supported browsers, with the config names in brackets:
+.RS
+.IP \(bu 3
+Firefox (firefox)
+.IP \(bu 3
+Chromium (chromium)
+.IP \(bu 3
+Google-chrome (google-chrome-stable, google-chrome-beta, google-chrome-unstable)
+.IP \(bu 3
+Vivaldi (vivaldi, vivaldi-snapshot)
+.IP \(bu 3
+Opera (opera)
+.IP \(bu 3
+Brave (brave)
+.IP \(bu 3
+Falkon (falkon)
+.RE
+.SH OVERLAY
+Browser-on-ram can mount your data on an overlay filesystem, which can significantly reduce memory usage, as only changed data needs to be stored on RAM. To
+do this, it uses Linux capabilities (specifically \fISYS_ADMIN_CAP\fR and \fISYS_DAC_OVERRIDE\fR). These capabilities are only raised to effective mode when
+mounting the overlay filesystem and deleting the root owned work directory needed by the overlay filesystem on unsync. If anything related to interacting
+with capabilties fails, the program immediately exits.
+.SH ADDING BROWSERS
+Browser-on-ram uses shell scripts that output the information needed to sync them. You can use echo for this.
+.br
+In short they are in the format of an ini file, parsed line by line:
+
+.RS
+.ft CR
+.nf
+.eo
+# browser-on-ram will automatically set XDG_CONFIG_HOME, XDG_CACHE_HOME, and
+# XDG_DATA_HOME environment variables when calling the script
+
+# process name of the browser
+procname = mybrowser
+
+# cache directories (usually in $HOME/.cache)
+cache = /home/user/.cache/mycache
+
+# profile directory (such as an individual profile or a single monolithic one)
+profile = /home/user/.config/mybrowser
+
+# ... <additional cache/profiles>
+.ec
+.fi
+.ft R
+.RE
+
+These should be placed in $XDG_CONFIG_HOME/bor/scripts, /usr/local/share/bor/scripts, /usr/share/bor/scripts with .sh extension.
+.br
+The first one found in that order is used.
+.SH DESIGN
+Browser-on-ram first parses the output from the shell script for each browser, and gets a list of directories to sync. It then copies each directory to the
+tmpfs, each prefixed with a SHA1 hash of the original path. Then, the directory is moved to the backup location and a symlink is created to the tmpfs.
+.SH AUTHOR
+Written by Foxe Chen (64-bitman).
+.SH REPORTING BUGS
+Please file an issue report at \fIhttps://github.com/64-bitman/browser-on-ram/issues\fR.
+.SH REPOSITORY
+The source code repository is at \fIhttps://github.com/64-bitman/browser-on-ram\fR.

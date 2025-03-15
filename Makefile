@@ -74,7 +74,7 @@ test: all
 setcap:
 	sudo setcap 'cap_dac_override,cap_sys_admin=p' $(TARGET)
 
-install: install-files install-systemd
+install: install-files install-systemd install-man
 
 install-files:
 	install -dm 755 $(PREFIX)/share/bor/scripts
@@ -87,9 +87,13 @@ install-systemd:
 	install -Dm 644 systemd/user/* $(PREFIX)/lib/systemd/user/
 	install -Dm 644 systemd/system/* $(PREFIX)/lib/systemd/system/
 
+install-man:
+	install -dm 755 $(PREFIX)/share/man/man1
+	install -Dm 644 doc/bor.1 $(PREFIX)/share/man/man1/
+
 install-cap:
 	setcap 'cap_dac_override,cap_sys_admin=p' $(PREFIX)/bin/bor
 
 -include $(DEPS)
 
-.PHONY: all clean prebuild rebuild run setcap install install-systemd install-cap
+.PHONY: all clean prebuild rebuild run setcap install install-files install-systemd install-man install-cap
