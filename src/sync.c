@@ -43,7 +43,8 @@ static bool directory_is_safe(struct Dir *dir);
 int do_action_on_browser(struct Browser *browser, enum Action action,
                          bool overlay)
 {
-        plog(LOG_INFO, "%sing browser %s", action_str[action], browser->name);
+        plog(LOG_INFO, "doing '%s' on browser %s", action_str[action],
+             browser->name);
 
         char backup[PATH_MAX], tmpfs[PATH_MAX], otmpfs[PATH_MAX];
 
@@ -278,7 +279,6 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
 // a normal resync should be done before this this
 int reset_overlay(void)
 {
-
         plog(LOG_INFO, "resetting overlay");
 
         if (!overlay_mounted()) {
@@ -333,7 +333,7 @@ static int repoint_dirs(const char *target)
 
                         // skip if path doesn't exist or is not a symlink
                         if (!LEXISTS(dir->path) || !S_ISLNK(sb.st_mode)) {
-                                plog(LOG_WARN , "not resyncing directory %s",
+                                plog(LOG_WARN, "not resyncing directory %s",
                                      dir->path);
                                 continue;
                         }
@@ -350,7 +350,8 @@ static int repoint_dirs(const char *target)
 
                         // create symlink
                         if (symlink(path, tmp_path) == -1) {
-                                plog(LOG_WARN, "failed creating symlink %s", tmp_path);
+                                plog(LOG_WARN, "failed creating symlink %s",
+                                     tmp_path);
                                 PERROR();
                                 continue;
                         }
@@ -359,7 +360,8 @@ static int repoint_dirs(const char *target)
                         if (renameat2(AT_FDCWD, tmp_path, AT_FDCWD, dir->path,
                                       RENAME_EXCHANGE) == -1) {
                                 plog(LOG_WARN,
-                                     "failed swapping dir and symlink for %s", dir->path);
+                                     "failed swapping dir and symlink for %s",
+                                     dir->path);
                                 unlink(tmp_path);
                                 PERROR();
                                 continue;

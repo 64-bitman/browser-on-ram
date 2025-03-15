@@ -50,7 +50,6 @@ int main(int argc, char **argv)
 
         int opt, opt_index;
         enum Action action = ACTION_NONE;
-        bool status = false, clean = false;
 
         while ((opt = getopt_long(argc, argv, "Vvhsurcxp", long_options,
                                   &opt_index)) != -1) {
@@ -74,22 +73,22 @@ int main(int argc, char **argv)
                         action = ACTION_RESYNC;
                         break;
                 case 'c':
-                        clean = true;
+                        action = ACTION_RMRECOVERY;
                         break;
                 case 'x':
                         action = ACTION_RMCACHE;
                         break;
                 case 'p':
-                        status = true;
+                        action = ACTION_STATUS;
                         break;
                 default:
                         return 0;
                 }
         }
-        if (status) {
+        if (action == ACTION_STATUS) {
                 print_status();
                 return 0;
-        } else if (clean) {
+        } else if (action == ACTION_RMRECOVERY) {
                 return (clear_recovery_dirs() == -1) ? 1 : 0;
         }
         if (action == ACTION_NONE) {

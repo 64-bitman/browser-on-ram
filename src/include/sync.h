@@ -11,10 +11,12 @@ enum Action {
         ACTION_SYNC,
         ACTION_UNSYNC,
         ACTION_RESYNC,
+        ACTION_STATUS,
+        ACTION_RMRECOVERY,
         ACTION_RMCACHE
 };
-static char *action_str[] = { "none",   "sync",   "unsync",
-                              "resync", "status", "clear cache" };
+static char *action_str[] = { "none",   "sync",     "unsync",     "resync",
+                              "status", "recovery", "clear cache" };
 
 int do_action_on_browser(struct Browser *browser, enum Action action,
                          bool overlay);
