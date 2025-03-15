@@ -35,7 +35,7 @@ static int fix_tmpfs(char *backup, char *tmpfs, bool overlay);
 
 static int recover_path(struct Dir *syncdir, const char *path);
 
-int clear_cache(const char *backup, const char *tmpfs);
+static int clear_cache(struct Dir *dir, const char *backup, const char *tmpfs);
 
 static bool directory_is_safe(struct Dir *dir);
 
@@ -75,7 +75,7 @@ int do_action_on_browser(struct Browser *browser, enum Action action,
 
                 // clear cache in tmpfs and backup
                 if (action == ACTION_RMCACHE && dir->type == DIR_CACHE) {
-                        if (clear_cache(backup, tmpfs) == -1) {
+                        if (clear_cache(dir, backup, tmpfs) == -1) {
                                 plog(LOG_ERROR, "failed clearing cache for %s",
                                      dir->path);
                         }
@@ -560,7 +560,7 @@ static int recover_path(struct Dir *sync_dir, const char *path)
         return 0;
 }
 
-int clear_cache(const char *backup, const char *tmpfs)
+static int clear_cache(struct Dir *dir, const char *backup, const char *tmpfs)
 {
         struct stat sb;
 
@@ -578,6 +578,14 @@ int clear_cache(const char *backup, const char *tmpfs)
         if (DIREXISTS(backup)) {
                 plog(LOG_INFO, "clearing cache %s", backup);
                 if (clear_dir(backup) == -1) {
+                        PERROR();
+                        return -1;
+                }
+        }
+
+        if (DIREXISTS(dir->path)) {
+                plog(LOG_INFO, "clearing cache %s", dir->path);
+                if (clear_dir(dir->path) == -1) {
                         PERROR();
                         return -1;
                 }
