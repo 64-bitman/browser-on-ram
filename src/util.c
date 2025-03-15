@@ -8,6 +8,7 @@
 #include <unistd.h>
 #include <glob.h>
 #include <time.h>
+#include <sys/sendfile.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -619,6 +620,48 @@ bool name_is_dot(const char *name)
                 return true;
         }
         return false;
+}
+
+// copy a single regular file
+int copy_rfile(const char *src, const char *dest)
+{
+        int err = 0;
+        int src_fd = open(src, O_RDONLY), dest_fd = creat(dest, 0644);
+
+        if (src_fd == -1 || dest_fd == -1) {
+                err = -1;
+                goto exit;
+        }
+        struct stat sb;
+
+        if (fstat(src_fd, &sb) == -1) {
+                err = -1;
+                goto exit;
+        }
+
+        off_t offset = 0;
+        ssize_t copied = 0;
+
+        while (copied < sb.st_size) {
+                ssize_t w =
+                        sendfile(dest_fd, src_fd, &offset, sb.st_size - copied);
+
+                if (w == -1) {
+                        err = -1;
+                        goto exit;
+                }
+                copied += w;
+        }
+
+exit:
+        if (src_fd != -1) {
+                close(src_fd);
+        }
+        if (dest_fd != -1) {
+                close(dest_fd);
+        }
+
+        return err;
 }
 
 // vim: sw=8 ts=8

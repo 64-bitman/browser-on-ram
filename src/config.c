@@ -135,7 +135,7 @@ int init_config(bool save_config)
         // this is so changes don't affect current sync session
         if (FEXISTS(borconf)) {
                 if (!FEXISTS(dotborconf)) {
-                        if (copy_path(borconf, dotborconf, false) == -1) {
+                        if (copy_rfile(borconf, dotborconf) == -1) {
                                 plog(LOG_ERROR, "failed copying config file");
                                 PERROR();
                                 return -1;
