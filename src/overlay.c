@@ -1,5 +1,6 @@
 #include "overlay.h"
 #include "config.h"
+#include "log.h"
 #include "util.h"
 
 #include <sys/capability.h>

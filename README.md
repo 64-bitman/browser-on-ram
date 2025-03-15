@@ -79,6 +79,10 @@ enable_overlay = false
 # (where changes are stored on the tmpfs)
 reset_overlay = false
 
+# maximum number of log entries to store in log file
+# (0 to disable logging to a file and a negative number for infinite entries)
+max_log_entires = 10
+
 # default is no browser
 [browsers]
 mybrowser

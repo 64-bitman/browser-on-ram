@@ -1,4 +1,5 @@
 #include "config.h"
+#include "log.h"
 #include "sync.h"
 #include "overlay.h"
 #include "util.h"
@@ -37,6 +38,7 @@ void print_status(void);
 
 int main(int argc, char **argv)
 {
+        // clang-format off
         struct option long_options[] = { { "version", no_argument, NULL, 'v' },
                                          { "verbose", no_argument, NULL, 'V' },
                                          { "help", no_argument, NULL, 'h' },
@@ -47,6 +49,7 @@ int main(int argc, char **argv)
                                          { "rm_cache", no_argument, NULL, 'x' },
                                          { "status", no_argument, NULL, 'p' },
                                          { NULL, 0, NULL, 0 } };
+        // clang-format on
 
         int opt, opt_index;
         enum Action action = ACTION_NONE;
@@ -95,6 +98,25 @@ int main(int argc, char **argv)
                 return 0;
         }
 
+        // init everything before doing the given action
+        if (init(true) == -1) {
+                plog(LOG_ERROR, "failed initializing");
+                return 1;
+        }
+        if (create_dir(PATHS.backups, 0755) == -1 ||
+            create_dir(PATHS.tmpfs, 0755) == -1 ||
+            create_dir(PATHS.logs, 0755) == -1) {
+                plog(LOG_ERROR, "failed creating required directories");
+                PERROR();
+                return 1;
+        }
+
+        if (init_logger() == -1) {
+                plog(LOG_ERROR, "failed starting logger");
+                PERROR();
+                return 1;
+        }
+
         plog(LOG_INFO, "starting browser-on-ram " VERSION);
 
         // need rsync
@@ -115,16 +137,6 @@ int main(int argc, char **argv)
 // loop through configured browsers and do sync/unsync/resync on them
 int do_action(enum Action action)
 {
-        if (init(true) == -1) {
-                plog(LOG_ERROR, "failed initializing");
-                return -1;
-        }
-        if (create_dir(PATHS.backups, 0755) == -1 ||
-            create_dir(PATHS.tmpfs, 0755) == -1) {
-                plog(LOG_ERROR, "failed creating required directories");
-                PERROR();
-                return -1;
-        }
         size_t did_action = 0;
         bool overlay = false;
 
@@ -187,7 +199,7 @@ int do_action(enum Action action)
                 }
         }
 
-        if (!overlay && overlay_mounted()) {
+        if (!overlay && overlay_mounted() && action == ACTION_UNSYNC) {
                 plog(LOG_WARN,
                      "tmpfs is mounted, but required capabilities do not exist");
         } else if (action == ACTION_UNSYNC && overlay_mounted() &&

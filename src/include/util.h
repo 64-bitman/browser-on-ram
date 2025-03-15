@@ -60,13 +60,7 @@
                 trim(buf);                                 \
         } while (0)
 
-enum LogLevel { LOG_DEBUG, LOG_INFO, LOG_WARN, LOG_ERROR };
-
-extern enum LogLevel LOG_LEVEL;
-
-void plog(enum LogLevel level, const char *format, ...);
 int create_dir(const char *path, mode_t mode);
-
 char **search_path(size_t *len, const char *path, size_t count, ...);
 void free_str_array(char **arr, size_t arr_len);
 int trim(char *str);
@@ -79,7 +73,8 @@ int clear_dir(const char *path);
 int move_path(const char *src, const char *dest, bool include_root);
 int replace_paths(const char *target, const char *src);
 
-void create_unique_path(char *buf, size_t buf_size, const char *path);
+void create_unique_path(char *buf, size_t buf_size, const char *path,
+                        size_t max_iter);
 bool file_has_bad_perms(const char *path);
 
 void set_caps(cap_flag_t set, cap_flag_value_t state, size_t count, ...);

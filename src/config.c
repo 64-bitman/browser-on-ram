@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "config.h"
+#include "log.h"
 #include "util.h"
 #include "ini.h"
 
@@ -9,7 +10,7 @@
 #include <unistd.h>
 
 // OPT_END -> signify end of opt array
-enum OptType { OPT_END, OPT_BOOL };
+enum OptType { OPT_END, OPT_BOOL, OPT_INT };
 struct Opt {
         char *name;
         void *data;
@@ -36,7 +37,8 @@ static struct Opt OPTS[] = {
 #endif
         { "enable_cache", &CONFIG.enable_cache, OPT_BOOL },
         { "resync_cache", &CONFIG.resync_cache, OPT_BOOL },
-        { "reset_overlay", &CONFIG.reset_overlay, OPT_BOOL},
+        { "reset_overlay", &CONFIG.reset_overlay, OPT_BOOL },
+        { "max_log_entries", &CONFIG.max_log_entries, OPT_INT },
         { NULL, NULL, OPT_END }
 };
 
@@ -53,6 +55,7 @@ int init_paths(void)
         snprintf(PATHS.tmpfs, PATH_MAX, "%s/tmpfs", PATHS.runtime);
         snprintf(PATHS.config, PATH_MAX, "%s/bor", getenv("XDG_CONFIG_HOME"));
         snprintf(PATHS.backups, PATH_MAX, "%s/backups", PATHS.config);
+        snprintf(PATHS.logs, PATH_MAX, "%s/logs", PATHS.config);
         snprintf(PATHS.share_dir, PATH_MAX, "/usr/share/bor/");
         snprintf(PATHS.share_dir_local, PATH_MAX, "/usr/local/share/bor");
 
@@ -114,6 +117,7 @@ int init_config(bool save_config)
         CONFIG.enable_cache = false;
         CONFIG.resync_cache = true;
         CONFIG.reset_overlay = false;
+        CONFIG.max_log_entries = 10;
 
         char borconf[PATH_MAX], dotborconf[PATH_MAX];
 
@@ -205,6 +209,12 @@ static int section_config_handler(const char *name, const char *value)
                                 *(bool *)(OPTS[i].data) = false;
                         }
                         break;
+                case OPT_INT: {
+                        long int num = strtol(value, NULL, 10);
+
+                        *(int *)(OPTS[i].data) = (int)num;
+                        break;
+                }
                 default:
                         continue;
                 }

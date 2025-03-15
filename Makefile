@@ -37,7 +37,7 @@ INCLUDE_PATH := ./src/include
 TARGET_NAME := bor
 TARGET := $(BIN_PATH)/$(TARGET_NAME)
 
-SRC := main.c util.c config.c types.c sync.c overlay.c ini.c teeny-sha1.c
+SRC := main.c log.c util.c config.c types.c sync.c overlay.c ini.c teeny-sha1.c
 OBJ := $(addprefix $(OBJ_PATH)/, $(SRC:.c=.o))
 DEPS := $(addprefix $(DEP_PATH)/, $(notdir $(OBJ:.o=.d)))
 

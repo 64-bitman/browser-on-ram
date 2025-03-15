@@ -1,5 +1,6 @@
 #include "types.h"
 #include "util.h"
+#include "log.h"
 
 #include <libgen.h>
 #include <stdlib.h>

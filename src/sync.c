@@ -1,5 +1,6 @@
 #define _GNU_SOURCE
 #include "sync.h"
+#include "log.h"
 #include "overlay.h"
 #include "types.h"
 #include "util.h"
@@ -148,7 +149,7 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                 // temporary path to swap with dir
                 char tmp_path[PATH_MAX];
 
-                create_unique_path(tmp_path, PATH_MAX, dir->path);
+                create_unique_path(tmp_path, PATH_MAX, dir->path, 0);
 
                 // create symlink
                 if (symlink(tmpfs, tmp_path) == -1) {
@@ -262,6 +263,7 @@ static int resync_dir(struct Dir *dir, char *backup, char *tmpfs, char *otmpfs,
         char *tmp = (overlay) ? otmpfs : tmpfs;
         bool do_sync = true;
 
+        // dont resync if otmpfs doesn't exist (means there arent any changes)
         if (overlay && !DIREXISTS(otmpfs)) {
                 do_sync = false;
         } else {
@@ -349,7 +351,7 @@ static int repoint_dirs(const char *target)
 
                         char tmp_path[PATH_MAX];
 
-                        create_unique_path(tmp_path, PATH_MAX, dir->path);
+                        create_unique_path(tmp_path, PATH_MAX, dir->path, 0);
 
                         // create symlink
                         if (symlink(path, tmp_path) == -1) {
@@ -551,7 +553,7 @@ static int recover_path(struct Dir *sync_dir, const char *path)
 
         char unique_path[PATH_MAX];
 
-        create_unique_path(unique_path, PATH_MAX, recovery_path);
+        create_unique_path(unique_path, PATH_MAX, recovery_path, 0);
 
         if (move_path(path, unique_path, false) == -1) {
                 plog(LOG_ERROR, "failed moving dir to %s", unique_path);

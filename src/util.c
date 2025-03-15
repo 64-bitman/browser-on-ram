@@ -7,6 +7,7 @@
 #include <libgen.h>
 #include <unistd.h>
 #include <glob.h>
+#include <time.h>
 
 #include <ctype.h>
 #include <errno.h>
@@ -19,27 +20,6 @@
 #include <string.h>
 #include <sys/stat.h>
 #include <sys/types.h>
-
-enum LogLevel LOG_LEVEL = LOG_INFO;
-
-static const char *log_str[] = { "DEBUG", "INFO", "WARN", "ERROR" };
-
-void plog(enum LogLevel level, const char *format, ...)
-{
-        if (LOG_LEVEL > level) {
-                return;
-        }
-
-        va_list args;
-
-        va_start(args, format);
-
-        fprintf(stderr, "%5s: ", log_str[level]);
-        vfprintf(stderr, format, args);
-        fprintf(stderr, "\n");
-
-        va_end(args);
-}
 
 // essentially mkdir -p
 int create_dir(const char *path, mode_t mode)
@@ -362,7 +342,7 @@ int replace_paths(const char *target, const char *src)
 {
         char beside_path[PATH_MAX];
 
-        create_unique_path(beside_path, PATH_MAX, target);
+        create_unique_path(beside_path, PATH_MAX, target, 0);
 
         if (move_path(src, beside_path, false) == -1) {
                 return -1;
@@ -379,21 +359,23 @@ int replace_paths(const char *target, const char *src)
 }
 
 // iterate over a number until there is a unused filename
-// in format of <path>-<number>
-// will null terminate buf and preserve errno
-void create_unique_path(char *buf, size_t buf_size, const char *path)
+// in format of <path>-<number>; will null terminate buf and preserve errno
+// if max_iter is 0 then use UNIQUE_PATH_MAX_ITER macro value
+void create_unique_path(char *buf, size_t buf_size, const char *path,
+                        size_t max_iter)
 {
         int prev_errno = errno;
+        size_t max = (max_iter == 0) ? UNIQUE_PATH_MAX_ITER : max_iter;
         struct stat sb;
 
         snprintf(buf, buf_size, "%s", path);
 
         if (EXISTS(buf)) {
-                size_t i = 0;
+                size_t i = 1;
 
-                while (EXISTS(buf) && i <= UNIQUE_PATH_MAX_ITER) {
-                        i++;
+                while (EXISTS(buf) && i <= max) {
                         snprintf(buf, PATH_MAX, "%s-%ld", path, i);
+                        i++;
                 }
         }
         errno = prev_errno;

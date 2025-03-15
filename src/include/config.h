@@ -14,6 +14,7 @@ struct ConfigSkel {
         bool enable_cache;
         bool resync_cache;
         bool reset_overlay;
+        int max_log_entries;
         struct Browser *browsers[MAX_BROWSERS];
         size_t browsers_num;
 };
@@ -23,6 +24,7 @@ struct PathsSkel {
         char tmpfs[PATH_MAX];
         char config[PATH_MAX];
         char backups[PATH_MAX];
+        char logs[PATH_MAX];
         char share_dir[PATH_MAX];
         char share_dir_local[PATH_MAX];
 
