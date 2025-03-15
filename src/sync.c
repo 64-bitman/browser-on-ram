@@ -135,6 +135,15 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
 
         plog(LOG_INFO, "syncing directory %s", dir->path);
 
+        // if backup exists but dir doesnt, then move backup to dir location
+        if (DIREXISTS(backup) && !DIREXISTS(dir->path)) {
+                if (move_path(backup, dir->path, false) == -1) {
+                        plog(LOG_ERROR, "failed moving backup to dir location");
+                        PERROR();
+                        return -1;
+                }
+        }
+
         // copy dir to tmpfs if we are not mounted (overlay)
         if (!overlay && !DIREXISTS(tmpfs)) {
                 if (copy_path(dir->path, tmpfs, false) == -1) {
