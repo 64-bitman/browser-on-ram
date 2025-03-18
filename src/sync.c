@@ -440,7 +440,7 @@ static int fix_session(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                         PERROR();
                         return -1;
                 }
-        } else if (stat(dir->path, &sb) == 0 && !S_ISDIR(sb.st_mode) &&
+        } else if (lstat(dir->path, &sb) == 0 && !S_ISDIR(sb.st_mode) &&
                    !S_ISLNK(sb.st_mode)) {
                 // dir is not a directory or symlink
                 plog(LOG_ERROR, "dir is not a directory nor a symlink");
