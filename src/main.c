@@ -272,7 +272,7 @@ int check_runtime_space(void)
                 for (size_t k = 0; k < browser->dirs_num; k++) {
                         struct Dir *dir = browser->dirs[k];
 
-                        if (lstat(dir->path, &sb) == -1 ||
+                        if (stat(dir->path, &sb) == -1 ||
                             !S_ISDIR(sb.st_mode)) {
                                 plog(LOG_WARN,
                                      "failed getting info about directory %s",
