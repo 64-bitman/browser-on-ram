@@ -124,6 +124,10 @@ static int sync_dir(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
         if (!DIREXISTS(dir->path)) {
                 plog(LOG_ERROR, "directory %s does not exist or is invalid",
                      dir->path);
+                if (SYMEXISTS(dir->path)) {
+                        plog(LOG_WARN,
+                             "dangling symlink exists in its place, directory may have possibly been lost");
+                }
                 return -1;
         }
 
@@ -431,6 +435,7 @@ static int fix_session(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                 return -1;
         }
 
+check:
         // create symlink if it doesn't exist
         if (DIREXISTS(tmpfs) && !LEXISTS(dir->path)) {
                 plog(LOG_INFO, "symlink does not exist, creating it");
@@ -463,6 +468,8 @@ static int fix_session(struct Dir *dir, char *backup, char *tmpfs, bool overlay)
                                 PERROR();
                                 return -1;
                         }
+                        // go back to create symlink
+                        goto check;
                 }
         }
 
