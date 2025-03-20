@@ -61,7 +61,7 @@ The executable name is `bor`. To see the current status, run `bor --status`. Use
 `bor --help` for additional info.
 
 # Config
-Sample config file with defaults, in ini format (in $XDG_CACHE_HOME/bor/bor.conf)
+Sample config file with defaults, in ini format (in $XDG_CONFIG_HOME/bor/bor.conf)
 ```ini
 # <boolean> = true or false
 
@@ -81,7 +81,7 @@ reset_overlay = false
 
 # maximum number of log entries to store in log file
 # (0 to disable logging to a file and a negative number for infinite entries)
-max_log_entires = 10
+max_log_entries = 10
 
 # default is no browser
 [browsers]
