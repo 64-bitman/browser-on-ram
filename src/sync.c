@@ -502,7 +502,7 @@ static int fix_tmpfs(char *backup, char *tmpfs, bool overlay)
         struct stat sb;
 
         // copy backup to tmpfs if it doesn't exist (only if no overlay)
-        if (!overlay && DIREXISTS(backup) && !DIREXISTS(tmpfs)) {
+        if (!overlay_mounted() && DIREXISTS(backup) && !DIREXISTS(tmpfs)) {
                 plog(LOG_INFO,
                      "tmpfs not found, syncing backup to tmpfs location");
 
