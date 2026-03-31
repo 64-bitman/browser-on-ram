@@ -9,7 +9,12 @@ while read -r profileItem; do
     else
         # we need to append the default path to give a
         # fully qualified path
-        echo "profile = $HOME/.mozilla/firefox/$profileItem"
-        echo "cache = $XDG_CACHE_HOME/mozilla/firefox/$profileItem"
+        if [[ -d "$XDG_CONFIG_HOME/mozilla" ]]
+            echo "profile = $XDG_CONFIG_HOME/mozilla/firefox/$profileItem"
+            echo "cache = $XDG_CACHE_HOME/mozilla/firefox/$profileItem"
+        else
+            echo "profile = $HOME/.mozilla/firefox/$profileItem"
+            echo "cache = $XDG_CACHE_HOME/mozilla/firefox/$profileItem"
+        fi
     fi
 done < <(grep '[Pp]'ath= "$HOME"/.mozilla/firefox/profiles.ini | sed 's/[Pp]ath=//')
